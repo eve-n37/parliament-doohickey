@@ -68,22 +68,25 @@ window.PB = window.PB || {};
   });
 
   PB.sampleState = () => {
+    // Seats are [House, Senate]. The Senate independent caucuses with the
+    // Federalists, so it gets its own entry (and coalition tick) like on Wikipedia.
     const parties = [
-      ['Democratic-Republican Party', 'DR', '#6a5acd', 134, false],
-      ['Independent', 'IND', '#9e9e9e', 5, false],
-      ['Vacant', '', '#e0e0e0', 3, false],
-      ['Federalist Party', 'FED', '#f2dc6d', 293, true],
-    ].map(([name, short, color, seats, coalition]) => PB.newParty({ name, short, color, seats: [seats, 0], coalition }));
+      ['Democratic-Republican Party', 'DR', '#6a5acd', [134, 12], false],
+      ['Independent', 'IND', '#9e9e9e', [5, 0], false],
+      ['Vacant', '', '#e0e0e0', [3, 0], false],
+      ['Independent (caucuses with the Federalists)', 'IND', '#cfc493', [0, 1], true],
+      ['Federalist Party', 'FED', '#f2dc6d', [293, 53], true],
+    ].map(([name, short, color, seats, coalition]) => PB.newParty({ name, short, color, seats, coalition }));
 
     // Keep vacant seats off both sides in the Westminster layout.
     parties[2].bench = 'crossbench';
 
     return {
-      system: 'unicameral',
+      system: 'bicameral',
       activeChamber: 0,
       chambers: [PB.newChamber({ name: 'NAU House of Representatives' }), PB.newChamber({ name: 'NAU Senate' })],
       parties,
-      ibPartyId: parties[3].id,
+      ibPartyId: parties[4].id,
     };
   };
 
