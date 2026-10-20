@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Parliament Builder</title>
-  <meta name="description" content="Build fictional parliaments and Wikipedia-style party infoboxes.">
+  <meta name="description" content="Build fictional parliaments and Wikipedia-style party infoboxes, then try governing one.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/wikibox.css">
@@ -22,6 +22,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" role="tab" data-tab="parliament" aria-selected="true">Parliament</button>
       <button class="tab" role="tab" data-tab="infobox" aria-selected="false">Party infobox</button>
+      <button class="tab" role="tab" data-tab="gov" aria-selected="false">Government</button>
     </nav>
     <div class="topbar-actions">
       <button type="button" id="btn-export-json" title="Download everything as a .json file">Save</button>
@@ -121,6 +122,52 @@
         </div>
       </div>
     </section>
+
+    <!-- Government tab -->
+    <section id="tab-gov" class="tab-panel">
+      <div class="layout">
+        <aside class="panel">
+          <h2>Government</h2>
+          <div id="gov-summary" class="gov-summary"></div>
+          <h2 id="gov-quarter">This quarter</h2>
+          <div id="gov-event"></div>
+          <div id="gov-bills"></div>
+          <button type="button" id="gov-end-turn" class="primary wide">End quarter →</button>
+
+          <div class="panel-head"><h2>Cabinet</h2></div>
+          <div id="gov-cabinet"></div>
+
+          <details class="gov-settings">
+            <summary>Sim settings</summary>
+            <label>Electoral system
+              <select id="gov-system">
+                <option value="fptp">First-past-the-post</option>
+                <option value="pr">Proportional</option>
+              </select>
+            </label>
+            <button type="button" id="gov-restart" class="small danger">Restart sim</button>
+          </details>
+        </aside>
+
+        <div class="preview">
+          <div class="stats" id="gov-stats"></div>
+          <div class="paper" id="gov-division"></div>
+          <div id="gov-tally"></div>
+          <div class="card">
+            <h2>Polls <span class="muted small">(seats if an election were held today)</span></h2>
+            <div id="gov-polls"></div>
+          </div>
+          <div class="card">
+            <h2>Approval</h2>
+            <div id="gov-trend"></div>
+          </div>
+          <div class="card">
+            <h2>What's happened</h2>
+            <ol id="gov-log" class="gov-log"></ol>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="foot muted small">
@@ -132,6 +179,7 @@
   <script src="js/toast.js"></script>
   <script src="js/parliament.js"></script>
   <script src="js/infobox.js"></script>
+  <script src="js/government.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

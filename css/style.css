@@ -314,6 +314,113 @@ fieldset > button.small { margin-bottom: 0.6rem; }
 
 .foot { text-align: center; padding: 1rem 1rem 2rem; }
 
+/* --- Government ------------------------------------------------------------------ */
+#tab-gov .preview { position: static; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+}
+.card h2 .muted { font-weight: normal; }
+
+.stat small { font-size: 0.8rem; margin-left: 0.35rem; font-weight: 600; }
+.stat small.muted { font-weight: normal; display: block; margin-left: 0; }
+
+.coal p + .coal-bar { margin-top: 0.55rem; }
+
+/* The paper stays light in dark mode, so the heading keeps dark ink. */
+.division-head { margin: 0 0 0.6rem; text-align: center; color: #202122; font-size: 0.95rem; }
+.divisions { display: grid; gap: 1rem; }
+.divisions.two { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+.tally-head { font-size: 0.85rem; margin: 0.6rem 0 0.2rem; }
+.tally-head:first-of-type { margin-top: 0; }
+
+.gov-summary p { margin: 0 0 0.3rem; }
+.gov-summary { margin-bottom: 1rem; }
+.gov-empty { margin: 1.5rem 0; text-align: center; }
+#gov-quarter { margin-top: 0.4rem; }
+
+.bill {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0.55rem 0.65rem;
+  background: var(--surface-2);
+  margin-bottom: 0.5rem;
+}
+.bill p { margin: 0.25rem 0 0.4rem; }
+.bill p:last-child { margin-bottom: 0; }
+.bill-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.bill-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem 0.6rem; flex-wrap: wrap; }
+.tag {
+  font-size: 0.72rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.gov-event {
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  padding: 0.6rem 0.65rem;
+  margin-bottom: 0.6rem;
+  background: var(--surface-2);
+}
+.gov-event p { margin: 0.3rem 0 0.55rem; }
+
+.minister { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr) minmax(0, auto); gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+.minister .post { font-size: 0.85rem; color: var(--muted); }
+.minister > span:last-child { max-width: 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gov-settings { margin-top: 1rem; }
+.gov-settings summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; margin-bottom: 0.6rem; }
+
+.swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  vertical-align: -0.05rem;
+}
+
+.tally { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.85rem; }
+.tally th, .tally td { padding: 0.3rem 0.4rem; text-align: right; border-bottom: 1px solid var(--border); }
+.tally th { color: var(--muted); font-weight: 600; }
+.tally th:first-child, .tally td:first-child { width: 52%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tally tr:last-child td { border-bottom: 0; }
+
+.poll-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(3rem, 1fr) 3.2rem 2.8rem;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+.poll-row.two { grid-template-columns: minmax(0, 1.2fr) minmax(2.5rem, 1fr) 3.2rem 2.6rem 2.6rem; }
+.poll-row > :nth-child(n + 3) { text-align: right; }
+.poll-headings { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.poll-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poll-bar { height: 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.poll-bar span { display: block; height: 100%; }
+
+.trend { display: block; width: 100%; height: 64px; }
+.trend-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.trend-mid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+
+.gov-log { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.gov-log li { padding: 0.35rem 0 0.35rem 0.55rem; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); }
+.gov-log li:last-child { border-bottom-color: transparent; }
+.gov-log li.good { border-left-color: var(--good); }
+.gov-log li.bad { border-left-color: var(--bad); }
+.gov-log li.election { border-left-color: var(--accent); font-weight: 600; }
+
 /* --- Toasts ---------------------------------------------------------------------- */
 .toasts {
   position: fixed;
@@ -360,6 +467,15 @@ fieldset > button.small { margin-bottom: 0.6rem; }
   .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .coal { grid-column: 1 / -1; }
   .topbar-actions { margin-left: 0; }
+
+  /* Government: stats on top, then the controls, then the charts. */
+  #tab-gov .preview { display: contents; }
+  #tab-gov .panel { order: 0; }
+  #gov-stats { order: -1; }
+  #tab-gov .preview > :not(#gov-stats) { order: 1; }
+  #gov-stats .stat { padding: 0.45rem 0.6rem; }
+  #gov-stats .stat span { font-size: 0.68rem; letter-spacing: 0.02em; }
+  #gov-stats .stat b { font-size: 1.1rem; white-space: nowrap; }
 }
 
 @media (max-width: 420px) {

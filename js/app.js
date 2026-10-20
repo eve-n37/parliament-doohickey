@@ -84,6 +84,7 @@
     renderParliament();
     renderStats();
     renderInfoboxPreview();
+    renderGov();
     PB.save();
   }
 
@@ -463,6 +464,216 @@
     });
   }
 
+  // --- Government sim -------------------------------------------------------------
+  const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0');
+
+  // News from the last action replaces the one before, so quick play doesn't
+  // bury the screen in toasts.
+  let govToasts = [];
+  function govNews(...args) {
+    govToasts.push(PB.notify(...args));
+  }
+  function clearGovNews() {
+    govToasts.forEach((dismiss) => dismiss());
+    govToasts = [];
+  }
+
+  function renderGov() {
+    PB.syncGov();
+    const g = st().gov;
+    const info = PB.govInfo();
+    renderGovStats(g, info);
+
+    const rec = g.record;
+    $('#gov-summary').innerHTML = info.members.length
+      ? `<p><b>${esc(PB.govLabel(info))}</b></p>
+         <p class="muted small">This term: ${rec.passed || 0} bill${rec.passed === 1 ? '' : 's'} passed, ${rec.failed || 0} defeated.</p>`
+      : '<p class="muted small">Nobody is governing yet.</p>';
+
+    $('#gov-quarter').textContent = `This quarter: ${PB.govDate(g.turn)}`;
+    renderGovEvent(g);
+    renderGovBills(g, info);
+    const end = $('#gov-end-turn');
+    end.disabled = !!g.event || !info.total;
+    end.title = g.event ? 'Deal with the event first' : '';
+
+    $('#gov-cabinet').innerHTML = g.cabinet.length
+      ? g.cabinet
+          .map((m, i) => {
+            const p = partyById(m.partyId);
+            return `
+      <div class="minister">
+        <span class="post">${esc(m.post)}</span>
+        <input type="text" data-post="${i}" value="${esc(m.name)}" aria-label="${esc(m.post)}">
+        <span class="small" title="${esc(p ? p.name : '')}"><span class="swatch" style="background:${esc(p ? p.color : '#ccc')}"></span>${esc(p ? p.short || p.name : '')}</span>
+      </div>`;
+          })
+          .join('')
+      : '<p class="muted small">The cabinet is formed from the governing parties.</p>';
+    $('#gov-system').value = g.system;
+
+    const vote = g.lastVote;
+    const bicameral = PB.chambersInUse().length > 1;
+    $('#gov-division').innerHTML = vote
+      ? `<p class="division-head"><b>${esc(vote.title)}</b> ${esc(vote.outcome)}</p>
+         <div class="divisions${vote.divisions.length > 1 ? ' two' : ''}">${vote.divisions.map((d) => PB.renderDivisionSVG(d, vote.kind, st())).join('')}</div>`
+      : '<p class="muted small gov-empty">No votes yet. Put a bill to the House and the division shows up here.</p>';
+    $('#gov-tally').innerHTML = vote
+      ? `<div class="card"><h2>How they voted <span class="muted small">(${PB.govDate(vote.turn)})</span></h2>
+         ${vote.divisions.map((d) => (bicameral ? `<h3 class="tally-head">${esc(PB.chamberName(d.chamber))}</h3>` : '') + PB.renderTallyHTML(d)).join('')}</div>`
+      : '';
+    $('#gov-polls').innerHTML = PB.renderPollsHTML();
+    $('#gov-trend').innerHTML = PB.renderTrendSVG(g.history);
+    $('#gov-log').innerHTML = g.log.length
+      ? g.log
+          .slice(0, 15)
+          .map((l) => `<li class="${esc(l.kind)}"><span class="muted">${PB.govDate(l.turn)}</span> ${esc(l.text)}</li>`)
+          .join('')
+      : '<li class="muted">Nothing yet. Pick a bill or end the quarter to get going.</li>';
+  }
+
+  function renderGovStats(g, info) {
+    const approval = Math.round(g.approval);
+    const change = approval - (g.history.length > 1 ? g.history[g.history.length - 2] : approval);
+    const left = g.electionDue - g.turn;
+    const bars = PB.chambersInUse()
+      .map((c) => govBar(c ? PB.govInfo(c) : info, c))
+      .join('');
+    $('#gov-stats').innerHTML = `
+      <div class="stat"><span>Date</span><b>${PB.govDate(g.turn)}</b></div>
+      <div class="stat"><span>Approval</span><b class="${approval >= 50 ? 'good' : approval < 35 ? 'bad' : ''}">${approval}%</b>${change ? `<small class="${change > 0 ? 'good' : 'bad'}">${change > 0 ? '▲' : '▼'}${Math.abs(change)}</small>` : ''}</div>
+      <div class="stat"><span>Next election</span><b>${PB.govDate(g.electionDue - 1)}</b><small class="muted">${left <= 1 ? 'end of this quarter' : `${left} quarters left`}</small></div>
+      <div class="coal">${bars}</div>`;
+  }
+
+  // Government seats against the majority line in one chamber.
+  function govBar(info, c) {
+    const pct = (n) => (info.total ? (n / info.total) * 100 : 0);
+    const segs = info.members.map((p) => `<div style="width:${pct(p.seats[c])}%;background:${esc(p.color)}" title="${esc(p.name)}: ${p.seats[c]}"></div>`).join('');
+    const where = PB.chambersInUse().length > 1 ? ` in the ${esc(PB.chamberName(c))}` : ' government seats';
+    return `
+        <div class="coal-bar">${segs}<span class="coal-tick" style="left:${pct(info.majority)}%"></span></div>
+        <p class="small"><b>${info.seats}</b>${where} ·
+          <span class="${info.isMajority ? 'good' : 'bad'}">${info.isMajority ? `majority of ${info.seats - (info.total - info.seats)}` : `short by ${info.majority - info.seats}`}</span></p>`;
+  }
+
+  function renderGovEvent(g) {
+    const def = g.event && PB.eventById(g.event.id);
+    $('#gov-event').innerHTML = def
+      ? `<div class="gov-event">
+          <b>⚡ ${esc(g.event.title)}</b>
+          <p class="small">${esc(g.event.text)}</p>
+          <div class="actions">${def.choices.map((c, i) => `<button type="button" class="small" data-choice="${i}">${esc(c.label)}</button>`).join('')}</div>
+        </div>`
+      : '';
+  }
+
+  const VERDICTS = { safe: ['good', 'looks safe'], close: ['', 'too close to call'], fail: ['bad', 'likely to fail'] };
+
+  function renderGovBills(g, info) {
+    const box = $('#gov-bills');
+    if (!info.total) {
+      box.innerHTML = '<p class="muted small">Add some parties with seats on the Parliament tab first.</p>';
+    } else if (!info.members.length) {
+      box.innerHTML = `
+        <div class="bill">
+          <p class="small">Tick <b>Coalition</b> on the governing parties in the Parliament tab, or let the largest party have a go.</p>
+          <button type="button" id="gov-form" class="small">Form a government</button>
+        </div>`;
+    } else if (g.voted && g.lastVote) {
+      const v = g.lastVote;
+      box.innerHTML = `
+        <div class="bill">
+          <p><b class="${v.passed ? 'good' : 'bad'}">${v.passed ? '✓' : '✗'}</b> ${esc(v.title)} ${esc(v.outcome)} (${v.divisions.map((d) => `${d.ayes}–${d.noes}`).join(', ')}).</p>
+          <p class="muted small">One bill per quarter. End the quarter to keep going.</p>
+        </div>`;
+    } else {
+      box.innerHTML =
+        `<p class="muted small">Pick one bill to put to the House, or skip straight to the end of the quarter.${
+          PB.chambersInUse().length > 1 ? ` Bills have to pass the ${esc(PB.chamberName(1))} too.` : ''
+        }</p>` +
+        g.offer
+          .map((id) => {
+            const bill = PB.billById(id);
+            const f = PB.forecast(bill);
+            const [cls, label] = f.swing ? ['', `depends on the ${esc(f.swing.short || f.swing.name)}`] : VERDICTS[f.verdict];
+            const mood = bill.pop >= 2 ? '👍 Popular' : bill.pop <= -1 ? '👎 Unpopular' : '🤷 Mixed';
+            const two = f.chambers.length > 1;
+            const count = f.chambers.map((x) => `${two ? (x.chamber ? 'upper ' : 'lower ') : ''}~${x.ayes}–${x.noes}`).join(', ');
+            return `
+        <div class="bill">
+          <div class="bill-head"><b>${esc(bill.name)}</b><span class="tag">${PB.leanLabel(bill.lean)}</span></div>
+          <p class="small muted">${esc(bill.desc)}</p>
+          <div class="bill-foot">
+            <span class="small">${mood} · whips say ${count}, <span class="${cls}">${label}</span></span>
+            <button type="button" class="small" data-bill="${bill.id}">Put to a vote</button>
+          </div>
+        </div>`;
+          })
+          .join('');
+    }
+  }
+
+  $('#gov-bills').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-bill]');
+    if (btn) {
+      clearGovNews();
+      const v = PB.voteOnBill(btn.dataset.bill);
+      if (v) govNews(`${v.title} ${v.outcome} (${v.divisions.map((d) => `${d.ayes}–${d.noes}`).join(', ')}).`, v.passed ? 'info' : 'error');
+      refresh();
+    } else if (e.target.id === 'gov-form') {
+      clearGovNews();
+      const formed = PB.formGovernment();
+      govNews(formed.length ? `${PB.govLabel()} formed.` : 'No party can form a government.');
+      renderPartyList();
+      refresh();
+    }
+  });
+
+  $('#gov-event').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-choice]');
+    if (!btn) return;
+    clearGovNews();
+    const r = PB.resolveEvent(+btn.dataset.choice);
+    if (r) govNews(`${r.text} (${signed(r.delta)} approval)`, r.delta < 0 ? 'error' : 'info', 6000);
+    refresh();
+  });
+
+  $('#gov-end-turn').addEventListener('click', () => {
+    const snapshot = JSON.parse(JSON.stringify(PB.state));
+    const res = PB.govEndTurn();
+    if (!res) return;
+    clearGovNews();
+    if (res.confidence && !res.confidence.passed) govNews(`The government survives a no-confidence vote, ${res.confidence.ayes}–${res.confidence.noes}.`);
+    if (res.event && !res.event.pending) govNews(`${res.event.title}: ${res.event.text} (${signed(res.event.delta)} approval)`, res.event.delta < 0 ? 'error' : 'info', 6000);
+    if (res.election) {
+      // Elections rewrite the seats, so they can be undone like a reset.
+      const e = res.election;
+      const top = e.results
+        .map((r) => (e.results.length > 1 ? `${PB.chamberName(r.chamber)}: ` : '') + r.rows.slice(0, 3).map((x) => `${x.short || x.name} ${x.seats}`).join(', '))
+        .join('; ');
+      offerStateUndo(`${res.confidence ? 'The government falls! ' : ''}${e.snap ? 'Snap election' : 'Election'}: ${top}. ${e.label}.`, snapshot);
+    } else {
+      refresh();
+    }
+  });
+
+  $('#gov-cabinet').addEventListener('input', (e) => {
+    const m = st().gov.cabinet[+e.target.dataset.post];
+    if (!m) return;
+    m.name = e.target.value;
+    PB.save();
+  });
+
+  $('#gov-system').addEventListener('change', (e) => {
+    st().gov.system = e.target.value;
+    refresh();
+  });
+
+  $('#gov-restart').addEventListener('click', () => {
+    replaceWithUndo('Restarted the government sim.', () => (st().gov = PB.newGov()));
+  });
+
   // --- Exports -------------------------------------------------------------------
   $('#dl-svg').addEventListener('click', () => {
     const svg = PB.renderParliamentSVG(st());
@@ -536,9 +747,13 @@
   // can be undone. Older undo toasts are cleared since they'd no longer apply.
   function replaceWithUndo(message, apply) {
     const snapshot = JSON.parse(JSON.stringify(PB.state));
+    apply();
+    offerStateUndo(message, snapshot);
+  }
+
+  function offerStateUndo(message, snapshot) {
     undoToasts.forEach((dismiss) => dismiss());
     undoToasts = [];
-    apply();
     renderAll();
     undoToasts.push(
       PB.notify(message, 'info', 7000, {
@@ -564,6 +779,6 @@
   renderAll();
   try {
     const tab = localStorage.getItem('parliament-builder:tab');
-    if (tab === 'infobox') showTab(tab);
+    if (tab === 'infobox' || tab === 'gov') showTab(tab);
   } catch (e) { /* ignore */ }
 })(window.PB);

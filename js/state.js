@@ -80,6 +80,9 @@ window.PB = window.PB || {};
 
     // Keep vacant seats off both sides in the Westminster layout.
     parties[2].bench = 'crossbench';
+    // Positions give the government sim something to whip on.
+    parties[0].info.position = 'Centre-left';
+    parties[4].info.position = 'Centre-right';
 
     return {
       system: 'bicameral',
@@ -87,7 +90,52 @@ window.PB = window.PB || {};
       chambers: [PB.newChamber({ name: 'NAU House of Representatives' }), PB.newChamber({ name: 'NAU Senate' })],
       parties,
       ibPartyId: parties[4].id,
+      gov: PB.newGov(),
     };
+  };
+
+  // Government sim state. Turns are quarters; vote shares (base) and the
+  // cabinet are filled in from the parliament when the sim first renders.
+  PB.newGov = () => ({
+    turn: 0,
+    startYear: 2029,
+    termTurns: 16,
+    electionDue: 16,
+    system: 'fptp',
+    approval: 50,
+    history: [50],
+    base: {},
+    noise: {},
+    cabinet: [],
+    offer: [],
+    voted: false,
+    enacted: [],
+    record: { passed: 0, failed: 0 },
+    event: null,
+    lastVote: null,
+    log: [],
+  });
+
+  PB.normalizeGov = (data) => {
+    const base = PB.newGov();
+    const g = { ...base, ...(data && typeof data === 'object' ? data : {}) };
+    ['turn', 'startYear', 'termTurns', 'electionDue', 'approval'].forEach((k) => {
+      g[k] = Number(g[k]);
+      if (!Number.isFinite(g[k])) g[k] = base[k];
+    });
+    ['history', 'cabinet', 'offer', 'enacted', 'log'].forEach((k) => {
+      if (!Array.isArray(g[k])) g[k] = [];
+    });
+    ['base', 'noise', 'record'].forEach((k) => {
+      if (!g[k] || typeof g[k] !== 'object' || Array.isArray(g[k])) g[k] = base[k];
+    });
+    if (g.system !== 'pr') g.system = 'fptp';
+    if (!g.history.length) g.history = [Math.round(g.approval)];
+    g.cabinet = g.cabinet.filter((m) => m && typeof m.name === 'string');
+    if (!g.event || typeof g.event.id !== 'string') g.event = null;
+    if (!g.lastVote || !Array.isArray(g.lastVote.divisions)) g.lastVote = null;
+    g.voted = !!g.voted;
+    return g;
   };
 
   PB.state = null;
@@ -128,6 +176,7 @@ window.PB = window.PB || {};
       chambers: [0, 1].map((c) => PB.newChamber({ ...base.chambers[c], ...(chambers[c] || {}) })),
       parties: Array.isArray(data.parties) ? data.parties.map((p) => PB.newParty({ ...p, id: p.id || PB.uid() })) : base.parties,
       ibPartyId: data.ibPartyId,
+      gov: PB.normalizeGov(data.gov),
     };
     st.parties.forEach((p) => {
       if (!Array.isArray(p.info.leaders)) p.info.leaders = [];

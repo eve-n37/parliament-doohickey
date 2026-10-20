@@ -1,6 +1,6 @@
 # 🏛️ Parliament Builder
 
-Build fictional parliaments and make Wikipedia-style infoboxes for their parties. Runs entirely in the browser with no build step and no backend.
+Build fictional parliaments, make Wikipedia-style infoboxes for their parties, then try governing one. Runs entirely in the browser with no build step and no backend.
 
 ![Parliament tab](docs/screenshot-parliament.png)
 
@@ -22,6 +22,15 @@ Build fictional parliaments and make Wikipedia-style infoboxes for their parties
 - Seat bars pull straight from the parliament (one per chamber), and you can add extra rows (regional councils and so on)
 - Export as **PNG**, or copy the **wikitext** to paste into a wiki
 
+**Government sim**
+- Govern the parliament you built, one quarter at a time, starting in 2029
+- Whoever's ticked as **Coalition** governs, based on the lower house; a cabinet is handed out between them (names are editable)
+- Each quarter, pick one of three bills and put it to a vote. Parties take a whip line based on how far the bill is from their **Political position** (from the infobox), members sometimes rebel, independents vote one by one, and the result is drawn as a division chart. In a bicameral legislature a bill has to pass both houses
+- Random events, some with choices (sack the minister or stand by them?)
+- Approval rating, polls with a seat projection, and an approval trend line
+- Elections every 4 years (first-past-the-post or proportional) rewrite the seat counts of every chamber in the Parliament tab, and the winners form a government. Minority governments can face no-confidence votes in the lower house
+- Elections can be undone, in case you really don't like the result
+
 **Data**
 - Autosaves in your browser (localStorage)
 - **Save** and **Load** a `.json` file to back up or share a whole universe
@@ -41,6 +50,7 @@ css/wikibox.css     the Wikipedia-style infobox
 js/state.js         state, storage, helpers, random generator
 js/parliament.js    seat layout algorithms + SVG rendering
 js/infobox.js       infobox HTML + wikitext export
+js/government.js    government sim: votes, events, polls, elections
 js/app.js           UI wiring
 ```
 
