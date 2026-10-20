@@ -176,9 +176,11 @@
 
   // Put a deleted party back where it was. Skipped if the party list has since
   // been swapped out (random, reset or load), so it can't leak into a new setup.
+  let undoToasts = [];
+
   function offerUndo(party, index, wasInfoboxParty) {
     const list = st().parties;
-    PB.notify(`Deleted "${party.name}".`, 'info', 7000, {
+    const dismiss = PB.notify(`Deleted "${party.name}".`, 'info', 7000, {
       label: 'Undo',
       onClick: () => {
         if (st().parties !== list || list.some((p) => p.id === party.id)) return;
@@ -190,6 +192,7 @@
         refresh();
       },
     });
+    undoToasts.push(dismiss);
   }
 
   $('#btn-add-party').addEventListener('click', () => {
@@ -204,19 +207,12 @@
     if (last) { last.focus(); last.select(); }
   });
 
-  $('#btn-random').addEventListener('click', async () => {
-    if (
-      st().parties.length &&
-      !(await PB.ask({
-        title: 'Roll a random parliament?',
-        message: 'This replaces your current parties. Save a .json first if you want to keep them.',
-        confirmLabel: 'Roll the dice',
-      }))
-    ) return;
-    const total = [101, 150, 200, 299, 350, 450, 600, 650][Math.floor(Math.random() * 8)];
-    st().parties = PB.randomParties(total);
-    st().ibPartyId = st().parties[0].id;
-    renderAll();
+  $('#btn-random').addEventListener('click', () => {
+    replaceWithUndo('Rolled a random parliament.', () => {
+      const total = [101, 150, 200, 299, 350, 450, 600, 650][Math.floor(Math.random() * 8)];
+      st().parties = PB.randomParties(total);
+      st().ibPartyId = st().parties[0].id;
+    });
   });
 
   $('#sort-select').addEventListener('change', (e) => {
@@ -464,8 +460,8 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        PB.state = PB.normalize(JSON.parse(reader.result));
-        renderAll();
+        const loaded = PB.normalize(JSON.parse(reader.result));
+        replaceWithUndo(`Loaded "${file.name}".`, () => (PB.state = loaded));
       } catch (err) {
         PB.notify('That file doesn\'t look like a Parliament Builder save.', 'error');
       }
@@ -474,17 +470,30 @@
     reader.readAsText(file);
   });
 
-  $('#btn-reset').addEventListener('click', async () => {
-    const ok = await PB.ask({
-      title: 'Reset everything?',
-      message: 'This goes back to the example parliament and throws away your parties and infoboxes.',
-      confirmLabel: 'Reset',
-      danger: true,
-    });
-    if (!ok) return;
-    PB.state = PB.sampleState();
-    renderAll();
+  $('#btn-reset').addEventListener('click', () => {
+    replaceWithUndo('Reset to the example parliament.', () => (PB.state = PB.sampleState()));
   });
+
+  // Swap in a whole new setup (random, reset, load), keeping a snapshot so it
+  // can be undone. Older undo toasts are cleared since they'd no longer apply.
+  function replaceWithUndo(message, apply) {
+    const snapshot = JSON.parse(JSON.stringify(PB.state));
+    undoToasts.forEach((dismiss) => dismiss());
+    undoToasts = [];
+    apply();
+    renderAll();
+    undoToasts.push(
+      PB.notify(message, 'info', 7000, {
+        label: 'Undo',
+        onClick: () => {
+          undoToasts.forEach((dismiss) => dismiss());
+          undoToasts = [];
+          PB.state = snapshot;
+          renderAll();
+        },
+      })
+    );
+  }
 
   function renderAll() {
     fillChamber();

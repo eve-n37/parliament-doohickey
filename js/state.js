@@ -49,35 +49,18 @@ window.PB = window.PB || {};
 
   PB.sampleState = () => {
     const parties = [
-      ['Velmoran Workers\' Front', 'VWF', '#c0392b', 41, false],
-      ['Green Tide', 'GT', '#2e9e4f', 28, true],
-      ['Social Democratic Union', 'SDU', '#e05a84', 77, true],
-      ['Liberal Reform Party', 'LRP', '#f2b51d', 33, true],
-      ['Christian People\'s Alliance', 'CPA', '#2c6fbb', 69, false],
-      ['National Restoration', 'NR', '#4b2e83', 52, false],
+      ['Democratic-Republican Party', 'DR', '#6a5acd', 134, false],
+      ['Independent', 'IND', '#9e9e9e', 5, false],
+      ['Vacant', '', '#e0e0e0', 3, false],
+      ['Federalist Party', 'FED', '#f2dc6d', 293, true],
     ].map(([name, short, color, seats, coalition]) => PB.newParty({ name, short, color, seats, coalition }));
 
-    Object.assign(parties[2].info, {
-      abbreviation: 'SDU',
-      leaders: [
-        { title: 'Leader', name: 'Mira Kastell' },
-        { title: 'General Secretary', name: 'Tomas Orvay' },
-      ],
-      founded: '14 March 1921',
-      headquarters: '12 Harbour Street, Port Velmor',
-      youthWing: 'Young Social Democrats',
-      membership: '118,400 (2025)',
-      ideology: 'Social democracy\nPro-Europeanism',
-      position: 'Centre-left',
-      international: 'Progressive Alliance',
-      coloursName: 'Pink',
-      slogan: '"Together, forward"',
-      website: 'https://sdu.example',
-    });
+    // Keep vacant seats off both sides in the Westminster layout.
+    parties[2].bench = 'crossbench';
 
     return {
       legislature: {
-        name: 'Grand Assembly of Velmora',
+        name: 'NAU House of Representatives',
         layout: 'hemicycle',
         shape: 'circle',
         size: 85,
@@ -86,7 +69,7 @@ window.PB = window.PB || {};
         title: true,
       },
       parties,
-      ibPartyId: parties[2].id,
+      ibPartyId: parties[3].id,
     };
   };
 
