@@ -317,6 +317,18 @@ button.danger-solid:hover { border-color: var(--text); }
   transition: opacity 0.25s, transform 0.25s;
 }
 .toast-error { background: var(--bad); color: #fff; }
+.toast { display: flex; align-items: center; gap: 0.9rem; }
+.toast-action {
+  pointer-events: auto;
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.toast-action:hover:not(:disabled) { border-color: currentColor; background: rgba(127, 127, 127, 0.25); }
 .toast.leaving { opacity: 0; transform: translateY(6px); }
 
 /* --- Small screens --------------------------------------------------------------- */

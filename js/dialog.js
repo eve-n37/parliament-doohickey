@@ -65,16 +65,37 @@
       document.addEventListener('keydown', onKey, true);
     });
 
-  // Short non-blocking message; kind is 'info' or 'error'.
-  PB.notify = (message, kind = 'info', ms = 4000) => {
+  // Short non-blocking message; kind is 'info' or 'error'. An optional action
+  // ({ label, onClick }) adds a button that runs once and closes the toast.
+  PB.notify = (message, kind = 'info', ms = 4000, action = null) => {
     ensureRoot();
     const el = document.createElement('div');
     el.className = `toast toast-${kind}`;
-    el.textContent = message;
-    toastBox.appendChild(el);
-    setTimeout(() => {
+    const text = document.createElement('span');
+    text.textContent = message;
+    el.appendChild(text);
+
+    let timer;
+    const dismiss = () => {
+      clearTimeout(timer);
       el.classList.add('leaving');
       setTimeout(() => el.remove(), 250);
-    }, ms);
+    };
+
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        dismiss();
+        action.onClick();
+      }, { once: true });
+      el.appendChild(btn);
+    }
+
+    toastBox.appendChild(el);
+    timer = setTimeout(dismiss, ms);
+    return dismiss;
   };
 })(window.PB);

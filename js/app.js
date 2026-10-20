@@ -168,7 +168,10 @@
       });
       if (!ok) return;
       const idx = st().parties.findIndex((p) => p.id === id);
-      if (idx !== -1) st().parties.splice(idx, 1);
+      if (idx !== -1) {
+        const [removed] = st().parties.splice(idx, 1);
+        offerUndo(removed, idx, st().ibPartyId === id);
+      }
     }
     if (act === 'infobox') {
       st().ibPartyId = id;
@@ -180,6 +183,24 @@
     renderIbSelect();
     refresh();
   });
+
+  // Put a deleted party back where it was. Skipped if the party list has since
+  // been swapped out (random, reset or load), so it can't leak into a new setup.
+  function offerUndo(party, index, wasInfoboxParty) {
+    const list = st().parties;
+    PB.notify(`Deleted "${party.name}".`, 'info', 7000, {
+      label: 'Undo',
+      onClick: () => {
+        if (st().parties !== list || list.some((p) => p.id === party.id)) return;
+        list.splice(Math.min(index, list.length), 0, party);
+        if (wasInfoboxParty) st().ibPartyId = party.id;
+        renderPartyList();
+        renderIbSelect();
+        renderIbForm();
+        refresh();
+      },
+    });
+  }
 
   $('#btn-add-party').addEventListener('click', () => {
     const used = new Set(st().parties.map((p) => p.color));
