@@ -150,7 +150,7 @@
     refresh();
   });
 
-  $('#party-list').addEventListener('click', async (e) => {
+  $('#party-list').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const id = btn.closest('.party').dataset.id;
@@ -160,18 +160,8 @@
     if (act === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
     if (act === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
     if (act === 'del') {
-      const ok = await PB.ask({
-        title: 'Delete party?',
-        message: `"${list[i].name}" and its infobox will be removed.`,
-        confirmLabel: 'Delete',
-        danger: true,
-      });
-      if (!ok) return;
-      const idx = st().parties.findIndex((p) => p.id === id);
-      if (idx !== -1) {
-        const [removed] = st().parties.splice(idx, 1);
-        offerUndo(removed, idx, st().ibPartyId === id);
-      }
+      const [removed] = list.splice(i, 1);
+      offerUndo(removed, i, st().ibPartyId === id);
     }
     if (act === 'infobox') {
       st().ibPartyId = id;
