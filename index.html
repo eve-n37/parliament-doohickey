@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parliament Builder</title>
+  <meta name="description" content="Build fictional parliaments and Wikipedia-style party infoboxes.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/wikibox.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🏛️ <span>Parliament Builder</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" role="tab" data-tab="parliament" aria-selected="true">Parliament</button>
+      <button class="tab" role="tab" data-tab="infobox" aria-selected="false">Party infobox</button>
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" id="btn-export-json" title="Download everything as a .json file">Save</button>
+      <label class="btn" title="Load a saved .json file">Load<input type="file" id="file-import" accept="application/json,.json" hidden></label>
+      <button type="button" id="btn-reset" class="ghost">Reset</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Parliament tab -->
+    <section id="tab-parliament" class="tab-panel active">
+      <div class="layout">
+        <aside class="panel">
+          <h2>Chamber</h2>
+          <label>Legislature name<input type="text" id="leg-name"></label>
+          <div class="row2">
+            <label>Layout
+              <select id="leg-layout">
+                <option value="hemicycle">Hemicycle</option>
+                <option value="horseshoe">Horseshoe</option>
+                <option value="circle">Circle</option>
+                <option value="westminster">Westminster</option>
+              </select>
+            </label>
+            <label>Seat shape
+              <select id="leg-shape">
+                <option value="circle">Circles</option>
+                <option value="square">Squares</option>
+              </select>
+            </label>
+          </div>
+          <label>Seat size<input type="range" id="leg-size" min="40" max="100" step="1"></label>
+          <div class="checks">
+            <label class="check"><input type="checkbox" id="leg-title"> Title</label>
+            <label class="check"><input type="checkbox" id="leg-legend"> Legend</label>
+            <label class="check arc-only"><input type="checkbox" id="leg-majority"> Majority line</label>
+          </div>
+          <p class="muted small wm-only">Westminster: <b>auto</b> puts coalition parties on the government benches and everyone else in opposition.</p>
+
+          <div class="panel-head">
+            <h2>Parties</h2>
+            <div class="panel-tools">
+              <select id="sort-select" aria-label="Sort parties">
+                <option value="">Sort…</option>
+                <option value="seats">By seats</option>
+                <option value="coalition">Coalition first</option>
+                <option value="reverse">Reverse order</option>
+              </select>
+              <button type="button" id="btn-random" title="Generate a random parliament">🎲</button>
+            </div>
+          </div>
+          <p class="muted small">Order goes left → right in the chart.</p>
+          <div id="party-list"></div>
+          <button type="button" id="btn-add-party" class="primary wide">+ Add party</button>
+        </aside>
+
+        <div class="preview">
+          <div class="stats" id="stats"></div>
+          <div class="paper" id="parliament-svg"></div>
+          <div class="actions">
+            <button type="button" id="dl-svg">Download SVG</button>
+            <button type="button" id="dl-png">Download PNG</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Infobox tab -->
+    <section id="tab-infobox" class="tab-panel">
+      <div class="layout">
+        <aside class="panel">
+          <label>Party<select id="ib-party"></select></label>
+          <div id="ib-form"></div>
+        </aside>
+
+        <div class="preview">
+          <div class="paper paper-center"><div id="ib-preview"></div></div>
+          <div class="actions">
+            <button type="button" id="ib-dl-png">Download PNG</button>
+            <button type="button" id="ib-copy">Copy wikitext</button>
+          </div>
+          <details class="wikitext">
+            <summary>Wikitext (<code>{{Infobox political party}}</code>)</summary>
+            <textarea id="ib-wikitext" rows="14" readonly spellcheck="false"></textarea>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot muted small">
+    Everything stays in your browser. Use <b>Save</b> to keep a copy. Parties are fictional, any resemblance is a coincidence (probably).
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/parliament.js"></script>
+  <script src="js/infobox.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
