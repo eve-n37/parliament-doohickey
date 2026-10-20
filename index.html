@@ -145,7 +145,12 @@
                 <option value="pr">Proportional</option>
               </select>
             </label>
-            <button type="button" id="gov-restart" class="small danger">Restart sim</button>
+            <label>Seed<input type="text" id="gov-seed" maxlength="24" spellcheck="false" autocomplete="off"></label>
+            <div class="actions">
+              <button type="button" id="gov-replay" class="small">Replay this seed</button>
+              <button type="button" id="gov-restart" class="small danger">New run</button>
+            </div>
+            <p class="muted small">The same seed, starting parliament and choices tell the same story. Replaying rewinds the seats to how they were when the run began.</p>
           </details>
         </aside>
 
@@ -158,6 +163,10 @@
             <div id="gov-polls"></div>
           </div>
           <div class="card">
+            <h2>Economy</h2>
+            <div id="gov-econ" class="econ"></div>
+          </div>
+          <div class="card">
             <h2>Approval</h2>
             <div id="gov-trend"></div>
           </div>
@@ -165,6 +174,10 @@
             <h2>What's happened</h2>
             <ol id="gov-log" class="gov-log"></ol>
           </div>
+          <details class="card ach-card">
+            <summary><h2>Achievements <span class="muted small" id="gov-ach-count"></span></h2></summary>
+            <div id="gov-ach" class="ach-grid"></div>
+          </details>
         </div>
       </div>
     </section>

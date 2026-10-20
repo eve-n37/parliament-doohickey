@@ -94,9 +94,16 @@ window.PB = window.PB || {};
     };
   };
 
-  // Government sim state. Turns are quarters; vote shares (base) and the
-  // cabinet are filled in from the parliament when the sim first renders.
-  PB.newGov = () => ({
+  // Short, easy-to-type seed for the sim's random numbers (no 0/O or 1/I).
+  PB.newSeed = () => Array.from({ length: 6 }, () => '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 32)]).join('');
+
+  // Government sim state. Turns are quarters; vote shares (base), the cabinet,
+  // by-elections and the starting parliament (start) are filled in from the
+  // parliament when the sim first renders. rng is the seeded generator's state.
+  PB.newGov = (seed = PB.newSeed()) => ({
+    seed,
+    rng: null,
+    start: null,
     turn: 0,
     startYear: 2029,
     termTurns: 16,
@@ -113,23 +120,51 @@ window.PB = window.PB || {};
     record: { passed: 0, failed: 0 },
     event: null,
     lastVote: null,
+    byElections: [], // { chamber, due, from }
+    govLeader: null,
+    govSince: 0,
+    econ: PB.newEconomy(),
     log: [],
+  });
+
+  // Growth (% a year), unemployment (%), and the budget balance (% of GDP,
+  // negative is a deficit), of which `structural` is set by laws. `cycle` and
+  // `boost` are the business cycle and the fading kick from recent policy.
+  PB.newEconomy = () => ({
+    growth: 2,
+    unemployment: 4.5,
+    balance: -3,
+    structural: -3,
+    cycle: 0,
+    boost: 0,
+    history: [[2, 4.5, -3]],
   });
 
   PB.normalizeGov = (data) => {
     const base = PB.newGov();
     const g = { ...base, ...(data && typeof data === 'object' ? data : {}) };
-    ['turn', 'startYear', 'termTurns', 'electionDue', 'approval'].forEach((k) => {
+    ['turn', 'startYear', 'termTurns', 'electionDue', 'approval', 'govSince'].forEach((k) => {
       g[k] = Number(g[k]);
       if (!Number.isFinite(g[k])) g[k] = base[k];
     });
-    ['history', 'cabinet', 'offer', 'enacted', 'log'].forEach((k) => {
+    ['history', 'cabinet', 'offer', 'enacted', 'byElections', 'log'].forEach((k) => {
       if (!Array.isArray(g[k])) g[k] = [];
     });
     ['base', 'noise', 'record'].forEach((k) => {
       if (!g[k] || typeof g[k] !== 'object' || Array.isArray(g[k])) g[k] = base[k];
     });
     if (g.system !== 'pr') g.system = 'fptp';
+    g.seed = String(g.seed || '').trim() || base.seed;
+    if (!Number.isInteger(g.rng)) g.rng = null;
+    if (!g.start || typeof g.start.seats !== 'object' || !Array.isArray(g.start.coalition)) g.start = null;
+    g.byElections = g.byElections.filter((b) => b && (b.chamber === 0 || b.chamber === 1) && Number.isFinite(b.due));
+    const econ = g.econ && typeof g.econ === 'object' ? g.econ : {};
+    g.econ = { ...base.econ, ...econ };
+    ['growth', 'unemployment', 'balance', 'structural', 'cycle', 'boost'].forEach((k) => {
+      g.econ[k] = Number(g.econ[k]);
+      if (!Number.isFinite(g.econ[k])) g.econ[k] = base.econ[k];
+    });
+    if (!Array.isArray(g.econ.history) || !g.econ.history.length) g.econ.history = [[g.econ.growth, g.econ.unemployment, g.econ.balance]];
     if (!g.history.length) g.history = [Math.round(g.approval)];
     g.cabinet = g.cabinet.filter((m) => m && typeof m.name === 'string');
     if (!g.event || typeof g.event.id !== 'string') g.event = null;

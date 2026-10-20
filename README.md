@@ -27,7 +27,11 @@ Build fictional parliaments, make Wikipedia-style infoboxes for their parties, t
 - Whoever's ticked as **Coalition** governs, based on the lower house; a cabinet is handed out between them (names are editable)
 - Each quarter, pick one of three bills and put it to a vote. Parties take a whip line based on how far the bill is from their **Political position** (from the infobox), members sometimes rebel, independents vote one by one, and the result is drawn as a division chart. In a bicameral legislature a bill has to pass both houses
 - Random events, some with choices (sack the minister or stand by them?)
+- An economy (growth, unemployment and the budget balance): bills show their economic effects, events can knock it about, and voters notice
 - Approval rating, polls with a seat projection, and an approval trend line
+- By-elections fill vacant seats, and members can quit or get expelled mid-term, so thin majorities can slip away
+- 17 achievements, kept in your browser across resets and new runs
+- Seeded runs: the same seed, starting parliament and choices replay the same story, so you can share a seed or retry a run
 - Elections every 4 years (first-past-the-post or proportional) rewrite the seat counts of every chamber in the Parliament tab, and the winners form a government. Minority governments can face no-confidence votes in the lower house
 - Elections can be undone, in case you really don't like the result
 

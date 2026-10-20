@@ -477,6 +477,9 @@
     govToasts.forEach((dismiss) => dismiss());
     govToasts = [];
   }
+  function announceAchievements() {
+    PB.takeNewAchievements().forEach((a) => govNews(`🏆 Achievement unlocked: ${a.icon} ${a.name}. ${a.desc}`, 'info', 7000));
+  }
 
   function renderGov() {
     PB.syncGov();
@@ -485,10 +488,15 @@
     renderGovStats(g, info);
 
     const rec = g.record;
-    $('#gov-summary').innerHTML = info.members.length
-      ? `<p><b>${esc(PB.govLabel(info))}</b></p>
+    const ahead = PB.byElectionsAhead();
+    const next = ahead.length
+      ? `<p class="muted small">📮 ${ahead.length} by-election${ahead.length === 1 ? '' : 's'} coming up, the next in ${PB.govDate(ahead[0].due)}.</p>`
+      : '';
+    $('#gov-summary').innerHTML =
+      (info.members.length
+        ? `<p><b>${esc(PB.govLabel(info))}</b></p>
          <p class="muted small">This term: ${rec.passed || 0} bill${rec.passed === 1 ? '' : 's'} passed, ${rec.failed || 0} defeated.</p>`
-      : '<p class="muted small">Nobody is governing yet.</p>';
+        : '<p class="muted small">Nobody is governing yet.</p>') + next;
 
     $('#gov-quarter').textContent = `This quarter: ${PB.govDate(g.turn)}`;
     renderGovEvent(g);
@@ -511,6 +519,7 @@
           .join('')
       : '<p class="muted small">The cabinet is formed from the governing parties.</p>';
     $('#gov-system').value = g.system;
+    if (document.activeElement !== $('#gov-seed')) $('#gov-seed').value = g.seed;
 
     const vote = g.lastVote;
     const bicameral = PB.chambersInUse().length > 1;
@@ -523,7 +532,10 @@
          ${vote.divisions.map((d) => (bicameral ? `<h3 class="tally-head">${esc(PB.chamberName(d.chamber))}</h3>` : '') + PB.renderTallyHTML(d)).join('')}</div>`
       : '';
     $('#gov-polls').innerHTML = PB.renderPollsHTML();
+    $('#gov-econ').innerHTML = PB.renderEconomyHTML();
     $('#gov-trend').innerHTML = PB.renderTrendSVG(g.history);
+    $('#gov-ach').innerHTML = PB.renderAchievementsHTML();
+    $('#gov-ach-count').textContent = `(${Object.keys(PB.earnedAchievements()).length}/${PB.ACHIEVEMENTS.length})`;
     $('#gov-log').innerHTML = g.log.length
       ? g.log
           .slice(0, 15)
@@ -600,10 +612,14 @@
             const mood = bill.pop >= 2 ? '👍 Popular' : bill.pop <= -1 ? '👎 Unpopular' : '🤷 Mixed';
             const two = f.chambers.length > 1;
             const count = f.chambers.map((x) => `${two ? (x.chamber ? 'upper ' : 'lower ') : ''}~${x.ayes}–${x.noes}`).join(', ');
+            const econ = PB.billEconomy(bill)
+              .map((fx) => `<span class="tag ${fx.good ? 'up' : 'down'}" title="${fx.tip}">${fx.text}</span>`)
+              .join('');
             return `
         <div class="bill">
           <div class="bill-head"><b>${esc(bill.name)}</b><span class="tag">${PB.leanLabel(bill.lean)}</span></div>
           <p class="small muted">${esc(bill.desc)}</p>
+          ${econ ? `<div class="chips">${econ}</div>` : ''}
           <div class="bill-foot">
             <span class="small">${mood} · whips say ${count}, <span class="${cls}">${label}</span></span>
             <button type="button" class="small" data-bill="${bill.id}">Put to a vote</button>
@@ -620,6 +636,7 @@
       clearGovNews();
       const v = PB.voteOnBill(btn.dataset.bill);
       if (v) govNews(`${v.title} ${v.outcome} (${v.divisions.map((d) => `${d.ayes}–${d.noes}`).join(', ')}).`, v.passed ? 'info' : 'error');
+      announceAchievements();
       refresh();
     } else if (e.target.id === 'gov-form') {
       clearGovNews();
@@ -636,6 +653,7 @@
     clearGovNews();
     const r = PB.resolveEvent(+btn.dataset.choice);
     if (r) govNews(`${r.text} (${signed(r.delta)} approval)`, r.delta < 0 ? 'error' : 'info', 6000);
+    announceAchievements();
     refresh();
   });
 
@@ -645,6 +663,7 @@
     if (!res) return;
     clearGovNews();
     if (res.confidence && !res.confidence.passed) govNews(`The government survives a no-confidence vote, ${res.confidence.ayes}–${res.confidence.noes}.`);
+    (res.byElections || []).forEach((b) => govNews(`📮 ${b.text}`, b.mood === 'bad' ? 'error' : 'info', 6000));
     if (res.event && !res.event.pending) govNews(`${res.event.title}: ${res.event.text} (${signed(res.event.delta)} approval)`, res.event.delta < 0 ? 'error' : 'info', 6000);
     if (res.election) {
       // Elections rewrite the seats, so they can be undone like a reset.
@@ -656,6 +675,7 @@
     } else {
       refresh();
     }
+    announceAchievements();
   });
 
   $('#gov-cabinet').addEventListener('input', (e) => {
@@ -671,7 +691,14 @@
   });
 
   $('#gov-restart').addEventListener('click', () => {
-    replaceWithUndo('Restarted the government sim.', () => (st().gov = PB.newGov()));
+    clearGovNews();
+    replaceWithUndo('Started a new run of the government sim.', () => PB.restartGov(null, false));
+  });
+
+  $('#gov-replay').addEventListener('click', () => {
+    const seed = $('#gov-seed').value.trim() || st().gov.seed;
+    clearGovNews();
+    replaceWithUndo(`Replaying seed ${seed.toUpperCase()} from the start.`, () => PB.restartGov(seed, true));
   });
 
   // --- Exports -------------------------------------------------------------------

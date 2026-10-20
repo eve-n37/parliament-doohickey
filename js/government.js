@@ -1,10 +1,37 @@
-// Government sim: bills and divisions, events, polling and elections.
+// Government sim: bills and divisions, events, the economy, polling,
+// elections and by-elections, plus achievements.
 (function (PB) {
   const esc = PB.esc;
   const gov = () => PB.state.gov;
-  const rand = (a, b) => a + Math.random() * (b - a);
-  const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // Every roll goes through a seeded generator (mulberry32) whose state is
+  // saved with the sim, so the same seed and the same choices replay exactly.
+  const hashSeed = (seed) => {
+    let h = 2166136261;
+    for (const ch of String(seed).toUpperCase()) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    return h | 0;
+  };
+
+  function random() {
+    const g = gov();
+    if (g.rng === null) g.rng = hashSeed(g.seed);
+    let t = (g.rng = (g.rng + 0x6d2b79f5) | 0);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  const rand = (a, b) => a + random() * (b - a);
+  const randInt = (a, b) => a + Math.floor(random() * (b - a + 1));
+  const pick = (arr) => arr[Math.floor(random() * arr.length)];
+  const shuffle = (list) => {
+    const out = [...list];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const sum = (list, f) => list.reduce((a, x) => a + f(x), 0);
 
@@ -19,6 +46,9 @@
   const FATIGUE = 0.01;
   // How far an upper-house result can wander from the national vote.
   const UPPER_DRIFT = 0.04;
+  // Long-run growth (% a year) and the unemployment rate the economy settles back to.
+  const TREND = 2;
+  const NATURAL = 4.5;
 
   PB.govDate = (turn) => `Q${(turn % 4) + 1} ${gov().startYear + Math.floor(turn / 4)}`;
 
@@ -85,30 +115,32 @@
 
   // --- Bills ----------------------------------------------------------------
   // lean: where the bill sits left to right. pop: how voters feel about it.
+  // econ: growth is a one-off kick that fades, budget a lasting change to the
+  // balance (% of GDP), jobs a change to unemployment.
   PB.BILLS = [
-    ['infrastructure', 'Infrastructure Renewal Act', 0, 3, 'Fix roads, bridges and water pipes across the country.'],
-    ['childcare', 'Universal Childcare Act', -1.5, 3, 'Free childcare for every family with kids under five.'],
-    ['minwage', 'Minimum Wage Act', -1, 2, 'Raise the federal minimum wage to $18 an hour.'],
-    ['carbon', 'Carbon Dividend Act', -1.5, 1, 'Tax carbon emissions and send the money back as a cheque.'],
-    ['broadband', 'Public Broadband Act', -1, 2, 'Fibre internet for every rural town.'],
-    ['drugprices', 'Drug Prices Act', -1, 3, 'Let the government negotiate prescription drug prices.'],
-    ['studentdebt', 'Student Debt Relief Act', -2, 1, 'Cancel up to $20,000 of student debt per borrower.'],
-    ['wealthtax', 'Wealth Tax Act', -2.5, 1, 'A 2% yearly tax on fortunes over $50 million.'],
-    ['ai', 'AI Accountability Act', -0.5, 2, 'Safety testing and audits for the most powerful AI models.'],
-    ['rail', 'High-Speed Rail Act', -0.5, 1, 'Bullet trains between the biggest cities.'],
-    ['housing', 'Housing Supply Act', 0, 2, 'Overrule local zoning to get more homes built.'],
-    ['districts', 'Fair Districts Act', -0.5, 0, 'Independent commissions to draw district maps.'],
-    ['taxsimple', 'Tax Simplification Act', 1, 2, 'Fewer brackets and a bigger standard deduction.'],
-    ['border', 'Border Security Act', 2, 1, 'More agents, more fencing and faster deportations.'],
-    ['corptax', 'Corporate Tax Cut', 2, -1, 'Cut the corporate tax rate from 21% to 15%.'],
-    ['redtape', 'Red Tape Reduction Act', 1.5, 0, 'Scrap a thousand federal regulations in one go.'],
-    ['budget', 'Balanced Budget Act', 1.5, 1, 'Make deficits illegal except in wartime.'],
-    ['police', 'Safe Streets Act', 1.5, 1, 'Federal money for 50,000 new police officers.'],
-    ['energy', 'Energy Independence Act', 1, 1, 'Fast-track drilling, pipelines and nuclear plants.'],
-    ['defence', 'Defence Modernisation Act', 1, 0, 'New ships, drones and cyber units for the armed forces.'],
-    ['farms', 'Family Farms Act', 0.5, 0, 'Bigger subsidies and crop insurance for farmers.'],
-    ['payrise', 'Members\' Pay Rise', 0, -4, 'A 20% pay rise for members of the House. Brave.'],
-  ].map(([id, name, lean, pop, desc]) => ({ id, name, lean, pop, desc }));
+    ['infrastructure', 'Infrastructure Renewal Act', 0, 3, 'Fix roads, bridges and water pipes across the country.', { growth: 0.8, budget: -0.4 }],
+    ['childcare', 'Universal Childcare Act', -1.5, 3, 'Free childcare for every family with kids under five.', { growth: 0.2, budget: -0.6, jobs: -0.1 }],
+    ['minwage', 'Minimum Wage Act', -1, 2, 'Raise the federal minimum wage to $18 an hour.', { jobs: 0.2 }],
+    ['carbon', 'Carbon Dividend Act', -1.5, 1, 'Tax carbon emissions and send the money back as a cheque.', { growth: -0.2 }],
+    ['broadband', 'Public Broadband Act', -1, 2, 'Fibre internet for every rural town.', { growth: 0.3, budget: -0.2 }],
+    ['drugprices', 'Drug Prices Act', -1, 3, 'Let the government negotiate prescription drug prices.', { budget: 0.3 }],
+    ['studentdebt', 'Student Debt Relief Act', -2, 1, 'Cancel up to $20,000 of student debt per borrower.', { growth: 0.2, budget: -0.5 }],
+    ['wealthtax', 'Wealth Tax Act', -2.5, 1, 'A 2% yearly tax on fortunes over $50 million.', { growth: -0.2, budget: 0.6 }],
+    ['ai', 'AI Accountability Act', -0.5, 2, 'Safety testing and audits for the most powerful AI models.', { growth: -0.1 }],
+    ['rail', 'High-Speed Rail Act', -0.5, 1, 'Bullet trains between the biggest cities.', { growth: 0.4, budget: -0.4 }],
+    ['housing', 'Housing Supply Act', 0, 2, 'Overrule local zoning to get more homes built.', { growth: 0.5 }],
+    ['districts', 'Fair Districts Act', -0.5, 0, 'Independent commissions to draw district maps.', {}],
+    ['taxsimple', 'Tax Simplification Act', 1, 2, 'Fewer brackets and a bigger standard deduction.', { growth: 0.2, budget: -0.3 }],
+    ['border', 'Border Security Act', 2, 1, 'More agents, more fencing and faster deportations.', { budget: -0.2 }],
+    ['corptax', 'Corporate Tax Cut', 2, -1, 'Cut the corporate tax rate from 21% to 15%.', { growth: 0.5, budget: -0.8 }],
+    ['redtape', 'Red Tape Reduction Act', 1.5, 0, 'Scrap a thousand federal regulations in one go.', { growth: 0.4 }],
+    ['budget', 'Balanced Budget Act', 1.5, 1, 'Make deficits illegal except in wartime.', { growth: -0.4, budget: 1 }],
+    ['police', 'Safe Streets Act', 1.5, 1, 'Federal money for 50,000 new police officers.', { budget: -0.3 }],
+    ['energy', 'Energy Independence Act', 1, 1, 'Fast-track drilling, pipelines and nuclear plants.', { growth: 0.4, budget: 0.1 }],
+    ['defence', 'Defence Modernisation Act', 1, 0, 'New ships, drones and cyber units for the armed forces.', { growth: 0.2, budget: -0.5 }],
+    ['farms', 'Family Farms Act', 0.5, 0, 'Bigger subsidies and crop insurance for farmers.', { budget: -0.2 }],
+    ['payrise', 'Members\' Pay Rise', 0, -4, 'A 20% pay rise for members of the House. Brave.', {}],
+  ].map(([id, name, lean, pop, desc, econ]) => ({ id, name, lean, pop, desc, econ }));
 
   PB.billById = (id) => PB.BILLS.find((b) => b.id === id);
 
@@ -117,7 +149,7 @@
     const g = gov();
     let pool = PB.BILLS.filter((b) => !g.enacted.includes(b.id));
     if (pool.length < 3) pool = [...PB.BILLS];
-    return [...pool].sort(() => Math.random() - 0.5).slice(0, 3).map((b) => b.id);
+    return shuffle(pool).slice(0, 3).map((b) => b.id);
   }
 
   // --- Divisions ----------------------------------------------------------------
@@ -143,10 +175,10 @@
           row.noes = present - row.ayes;
           row.absent = seats - present;
         } else {
-          const whipAye = !free && Math.random() < v.aye;
+          const whipAye = !free && random() < v.aye;
           for (let i = 0; i < seats; i++) {
-            if (Math.random() < ABSENT) row.absent++;
-            else if (free ? Math.random() < v.free : whipAye !== (Math.random() < v.rebel)) row.ayes++;
+            if (random() < ABSENT) row.absent++;
+            else if (free ? random() < v.free : whipAye !== (random() < v.rebel)) row.ayes++;
             else row.noes++;
           }
         }
@@ -237,9 +269,14 @@
       g.enacted.push(id);
       g.record.passed = (g.record.passed || 0) + 1;
       nudge(bill.pop * 0.6);
+      applyEconomy(bill.econ);
+      earn('first-law');
+      if (divisions.length > 1) earn('both-houses');
+      if (id === 'payrise') earn('pay-rise');
     } else {
       g.record.failed = (g.record.failed || 0) + 1;
       nudge(blocked ? -1.5 : -3);
+      if (blocked) earn('blocked');
     }
     log(`${bill.name} ${outcome} (${divisions.map((d) => `${d.ayes}–${d.noes}`).join(', ')}).`, passed ? 'good' : 'bad');
     return g.lastVote;
@@ -255,6 +292,7 @@
     else {
       log(`The government survives a confidence vote, ${d.ayes}–${d.noes}.`, 'good');
       nudge(1);
+      earn('survivor');
     }
     return g.lastVote;
   }
@@ -264,6 +302,8 @@
     const g = gov();
     g.approval = clamp(v, 3, 97);
     g.history[g.history.length - 1] = Math.round(g.approval);
+    if (g.approval >= 65) earn('beloved');
+    if (g.approval <= 30) earn('tomatoes');
   }
   const nudge = (delta) => setApproval(gov().approval + delta);
 
@@ -417,6 +457,7 @@
 
     const before = new Map(PB.state.parties.map((p) => [p, [...p.seats]]));
     const oldLabel = PB.govLabel();
+    const oldLeader = PB.govInfo().leader;
     const chambers = PB.chambersInUse();
     // Every chamber in use is elected from the same national vote, but the
     // upper house has its own electorate, so its result can drift a little.
@@ -426,8 +467,12 @@
       PB.state.parties.forEach((p) => (p.seats[c] = won.get(p) || 0));
     });
     const chosen = PB.formGovernment();
+    const after = PB.govInfo();
+    if (oldLeader && after.leader) earn(after.leader === oldLeader ? 'reelected' : 'change');
+    if (after.seats * 3 >= after.total * 2) earn('landslide');
 
     g.noise = {};
+    g.byElections = [];
     g.enacted = [];
     g.record = { passed: 0, failed: 0 };
     g.electionDue = g.turn + g.termTurns;
@@ -486,31 +531,35 @@
   }
 
   // --- Events ---------------------------------------------------------------------------
-  // approval: [min, max] change. sack: the minister is replaced.
-  // Text can use {pm}, {minister}, {post} and {replacement}.
+  // approval: [min, max] change. sack: the minister is replaced. growth, jobs
+  // and budget work like a bill's economic effects. vacancy: a member leaves,
+  // and ownGoal is an extra approval hit if they sat with the government.
+  // Text can use {pm}, {minister}, {post}, {replacement}, {member}, {party} and {chamber}.
   PB.EVENTS = [
-    { id: 'jobs', title: 'Strong jobs report', text: 'Unemployment hits a ten-year low.', approval: [2, 4] },
-    { id: 'recession', title: 'Recession fears', text: 'Two weak quarters in a row and the markets are jittery.', approval: [-5, -2] },
-    { id: 'trade', title: 'Trade deal signed', text: 'A long-stalled trade agreement finally gets over the line.', approval: [1, 3] },
+    { id: 'jobs', title: 'Strong jobs report', text: 'Hiring is way up and unemployment is falling fast.', approval: [1, 3], jobs: -0.4 },
+    { id: 'recession', title: 'Recession fears', text: 'Two weak quarters in a row and the markets are jittery.', approval: [-3, -1], growth: -1.5 },
+    { id: 'trade', title: 'Trade deal signed', text: 'A long-stalled trade agreement finally gets over the line.', approval: [1, 3], growth: 0.4 },
     { id: 'gaffe', title: 'Hot mic', text: '{pm} is caught calling a voter "a bit of a nightmare".', approval: [-3, -1] },
-    { id: 'fuel', title: 'Fuel prices spike', text: 'Prices at the pump hit a record high.', approval: [-4, -2] },
+    { id: 'fuel', title: 'Fuel prices spike', text: 'Prices at the pump hit a record high.', approval: [-3, -1], growth: -0.5 },
     { id: 'leak', title: 'Leaked memo', text: 'An internal memo doubting the budget numbers ends up on every front page.', approval: [-4, -1] },
     { id: 'oppscandal', title: 'Opposition in trouble', text: 'The opposition leader gets caught up in a lobbying scandal.', approval: [1, 3] },
-    { id: 'boom', title: 'Tech boom', text: 'A wave of new factories and startups lifts the mood.', approval: [1, 3] },
+    { id: 'boom', title: 'Tech boom', text: 'A wave of new factories and startups lifts the mood.', approval: [0, 2], growth: 0.8 },
     { id: 'quiet', title: 'Quiet quarter', text: 'Nothing much happens. Bliss.', approval: [0, 0], weight: 3 },
     { id: 'resign', minister: true, title: 'Resignation', text: '{minister} ({post}) resigns to spend more time with family. {replacement} steps in.', approval: [-2, 0], sack: true },
+    { id: 'mpquits', vacancy: true, title: 'Seat up for grabs', text: '{member} ({party}) quits the {chamber} to host a podcast. A by-election is on the way.' },
+    { id: 'mpexpelled', vacancy: true, title: 'Member expelled', text: '{member} ({party}) is expelled from the {chamber} over a bribery scandal. A by-election is on the way.', ownGoal: [-3, -1] },
     {
       id: 'storm', title: 'Hurricane', text: 'A major hurricane makes landfall, flooding thousands of homes.',
       choices: [
-        { label: 'Emergency aid package', approval: [1, 4], result: 'Aid arrives quickly and the government gets the credit.' },
+        { label: 'Emergency aid package', approval: [1, 4], budget: -0.1, result: 'Aid arrives quickly and the government gets the credit.' },
         { label: 'Leave it to the states', approval: [-6, -1], result: 'Pictures of stranded families lead the news for weeks.' },
       ],
     },
     {
       id: 'strike', title: 'Rail strike', text: 'Rail workers walk out over pay and freight grinds to a halt.',
       choices: [
-        { label: 'Negotiate', approval: [-1, 2], result: 'A deal is struck after a tense weekend of talks.' },
-        { label: 'Order them back to work', approval: [-5, 2], result: 'The trains run again, but the unions are furious.' },
+        { label: 'Negotiate', approval: [-1, 2], growth: -0.2, result: 'A deal is struck after a tense weekend of talks.' },
+        { label: 'Order them back to work', approval: [-5, 2], growth: 0.2, result: 'The trains run again, but the unions are furious.' },
       ],
     },
     {
@@ -521,7 +570,7 @@
       ],
     },
     {
-      id: 'cyber', title: 'Cyberattack', text: 'Hackers knock out the power grid across three states for a day.',
+      id: 'cyber', title: 'Cyberattack', text: 'Hackers knock out the power grid across three states for a day.', growth: -0.3,
       choices: [
         { label: 'Blame a foreign power', approval: [-2, 4], result: 'The country rallies, at least until the evidence is questioned.' },
         { label: 'Announce an inquiry', approval: [0, 1], result: 'Sensible, if not exciting.' },
@@ -530,8 +579,8 @@
     {
       id: 'outbreak', title: 'Outbreak', text: 'A nasty new flu strain is spreading fast.',
       choices: [
-        { label: 'Close schools for a month', approval: [-4, 2], result: 'Parents grumble, but hospitals cope.' },
-        { label: 'Keep everything open', approval: [-6, 3], result: 'A gamble. The next few weeks will tell.' },
+        { label: 'Close schools for a month', approval: [-4, 2], growth: -0.6, result: 'Parents grumble, but hospitals cope.' },
+        { label: 'Keep everything open', approval: [-6, 3], growth: -0.2, result: 'A gamble. The next few weeks will tell.' },
       ],
     },
     {
@@ -555,32 +604,67 @@
   function fill(text, ev) {
     const g = gov();
     const m = g.cabinet[ev.post];
+    const p = PB.state.parties.find((x) => x.id === ev.party);
     const words = {
       pm: g.cabinet[0] ? g.cabinet[0].name : 'The Prime Minister',
       minister: m ? m.name : 'The minister',
       post: m ? m.post : 'cabinet',
       replacement: ev.replacement,
+      member: ev.replacement,
+      party: p ? p.short || p.name : 'independent',
+      chamber: PB.chamberName(ev.chamber || 0),
     };
     return text.replace(/\{(\w+)\}/g, (all, k) => words[k] ?? all);
   }
 
   function applyEffect(effect, ev) {
     const [lo, hi] = effect.approval || [0, 0];
-    const delta = randInt(lo, hi);
+    let delta = randInt(lo, hi);
     const m = gov().cabinet[ev.post];
     if (effect.sack && m) m.name = ev.replacement;
+    if (effect.vacancy) {
+      if (effect.ownGoal && govIds().has(ev.party)) delta += randInt(...effect.ownGoal);
+      makeVacancy(ev);
+    }
+    applyEconomy(effect);
     nudge(delta);
     return delta;
+  }
+
+  // A member leaves mid-term: their seat sits empty until a by-election.
+  function makeVacancy(ev) {
+    const g = gov();
+    const p = PB.state.parties.find((x) => x.id === ev.party);
+    if (!p || !p.seats[ev.chamber]) return;
+    let vacant = PB.state.parties.find(PB.isVacant);
+    if (!vacant) {
+      vacant = PB.newParty({ name: 'Vacant', color: '#e0e0e0', seats: [0, 0], bench: 'crossbench' });
+      PB.state.parties.push(vacant);
+    }
+    p.seats[ev.chamber]--;
+    vacant.seats[ev.chamber]++;
+    g.byElections.push({ chamber: ev.chamber, due: g.turn + randInt(1, 2), from: p.id });
+  }
+
+  // Pick a seat to empty: bigger chambers and bigger parties are likelier.
+  function pickSeat() {
+    const chambers = PB.chambersInUse().filter((c) => PB.totalSeats(c) > 0);
+    let roll = random() * sum(chambers, (c) => PB.totalSeats(c));
+    const chamber = chambers.find((c) => (roll -= PB.totalSeats(c)) < 0) ?? chambers[0];
+    const held = PB.state.parties.filter((p) => !PB.isVacant(p) && p.seats[chamber] > 0);
+    roll = random() * sum(held, (p) => p.seats[chamber]);
+    const party = held.find((p) => (roll -= p.seats[chamber]) < 0) || held[0];
+    return party ? { chamber, party: party.id } : null;
   }
 
   const moodOf = (delta) => (delta > 0 ? 'good' : delta < 0 ? 'bad' : '');
 
   function rollEvent() {
     const g = gov();
-    const pool = PB.EVENTS.filter((e) => !e.minister || g.cabinet.length > 1);
-    let roll = Math.random() * sum(pool, (e) => e.weight || 1);
+    const pool = PB.EVENTS.filter((e) => (!e.minister || g.cabinet.length > 1) && (!e.vacancy || PB.state.parties.some((p) => !PB.isVacant(p) && p.seats[0] > 0)));
+    let roll = random() * sum(pool, (e) => e.weight || 1);
     const def = pool.find((e) => (roll -= e.weight || 1) < 0) || pool[0];
-    const ev = { id: def.id, post: def.minister ? randInt(1, g.cabinet.length - 1) : -1, replacement: randomName() };
+    const ev = { id: def.id, post: def.minister ? randInt(1, g.cabinet.length - 1) : -1, replacement: randomName(), ...(def.vacancy ? pickSeat() : {}) };
     const text = fill(def.text, ev);
     if (def.choices) {
       g.event = { ...ev, title: def.title, text };
@@ -604,15 +688,198 @@
     return { title: def.title, text, delta };
   };
 
+  // --- Economy ----------------------------------------------------------------------------
+  // Growth is trend plus the business cycle plus the fading kick from recent
+  // policy. The budget balance is what the laws set, moved by the cycle.
+  function settle() {
+    const e = gov().econ;
+    e.unemployment = clamp(e.unemployment, 1.5, 25);
+    e.growth = TREND + e.cycle + e.boost;
+    e.balance = e.structural + 0.3 * (e.growth - TREND) - 0.2 * (e.unemployment - NATURAL);
+    e.history[e.history.length - 1] = [e.growth, e.unemployment, e.balance].map((n) => Math.round(n * 10) / 10);
+    if (e.growth >= 4) earn('boom');
+    if (e.unemployment <= 3.5) earn('jobs');
+    if (e.balance > 0) earn('surplus');
+  }
+
+  function applyEconomy(fx = {}) {
+    const e = gov().econ;
+    e.boost += fx.growth || 0;
+    e.structural += fx.budget || 0;
+    e.unemployment += fx.jobs || 0;
+    settle();
+  }
+
+  // One quarter of economy. Returns how much it moves approval: voters feel
+  // growth and jobs, and get twitchy once the deficit passes 5% of GDP.
+  function stepEconomy() {
+    const e = gov().econ;
+    e.history.push(e.history[e.history.length - 1]);
+    if (e.history.length > 80) e.history.shift();
+    e.boost *= 0.7;
+    e.cycle = e.cycle * 0.75 + rand(-0.8, 0.8);
+    // Budgets get patched up (or blown out) over time, back towards a 3% deficit.
+    e.structural += (-3 - e.structural) * 0.03;
+    e.unemployment += 0.15 * (TREND - (TREND + e.cycle + e.boost)) + (NATURAL - e.unemployment) * 0.12;
+    settle();
+    return clamp(0.2 * (e.growth - TREND) - 0.3 * (e.unemployment - NATURAL) + Math.min(0, e.balance + 5) * 0.15, -1, 1);
+  }
+
+  // Labels for a bill's economic effects, for the bill cards.
+  PB.billEconomy = (bill) => {
+    const fx = bill.econ || {};
+    const num = (n) => `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
+    const out = [];
+    if (fx.growth) out.push({ text: `growth ${num(fx.growth)}`, good: fx.growth > 0, tip: 'A boost to growth that fades over a few quarters' });
+    if (fx.jobs) out.push({ text: `unemployment ${num(fx.jobs)}`, good: fx.jobs < 0, tip: 'Change in the unemployment rate' });
+    if (fx.budget) out.push({ text: `budget ${num(fx.budget)}%`, good: fx.budget > 0, tip: 'A lasting change to the budget balance, as a share of GDP' });
+    return out;
+  };
+
+  // --- By-elections -----------------------------------------------------------------------
+  // Keep one by-election queued for every vacant seat in the chambers in use.
+  function syncByElections() {
+    const g = gov();
+    const inUse = PB.chambersInUse();
+    [0, 1].forEach((c) => {
+      const vacant = inUse.includes(c) ? sum(PB.state.parties.filter(PB.isVacant), (p) => p.seats[c]) : 0;
+      const queued = g.byElections.filter((b) => b.chamber === c).sort((a, b) => b.due - a.due);
+      queued.slice(0, Math.max(0, queued.length - vacant)).forEach((b) => g.byElections.splice(g.byElections.indexOf(b), 1));
+      for (let i = queued.length; i < vacant; i++) g.byElections.push({ chamber: c, due: g.turn + randInt(1, 3), from: null });
+    });
+  }
+
+  PB.byElectionsAhead = () => [...gov().byElections].sort((a, b) => a.due - b.due || a.chamber - b.chamber);
+
+  // By-elections are a free hit at the government, and the old member's party
+  // starts with a local head start.
+  function byElection(be) {
+    const c = be.chamber;
+    const seat = PB.state.parties.find((p) => PB.isVacant(p) && p.seats[c] > 0);
+    if (!seat || !PB.chambersInUse().includes(c)) return null;
+    const ids = govIds();
+    const from = PB.state.parties.find((p) => p.id === be.from && !PB.isVacant(p));
+    const local = PB.polls().map((v) => ({
+      party: v.party,
+      share: v.share - (ids.has(v.party.id) ? 0.03 : 0) + (v.party === from ? 0.04 : 0) + rand(-0.08, 0.08),
+    }));
+    const winner = local.reduce((a, b) => (b.share > a.share ? b : a)).party;
+    seat.seats[c]--;
+    winner.seats[c]++;
+
+    const name = winner.short || winner.name;
+    const where = `the ${PB.chamberName(c)} by-election`;
+    let text = `${name} wins ${where}.`;
+    if (from === winner) text = `${name} holds the seat in ${where}.`;
+    else if (from) text = `${name} takes a seat from ${from.short || from.name} in ${where}.`;
+    let mood = '';
+    if (from && from !== winner && ids.has(from.id)) {
+      nudge(-1.5);
+      mood = 'bad';
+    } else if (ids.has(winner.id) && from !== winner) {
+      nudge(1);
+      mood = 'good';
+      if (from) earn('upset');
+    }
+    log(text, mood);
+    return { text, mood };
+  }
+
+  function runByElections() {
+    const g = gov();
+    const due = g.byElections.filter((b) => b.due <= g.turn);
+    g.byElections = g.byElections.filter((b) => b.due > g.turn);
+    return due.map(byElection).filter(Boolean);
+  }
+
+  // --- Achievements -----------------------------------------------------------------------
+  PB.ACHIEVEMENTS = [
+    ['first-law', '📜', 'First law', 'Pass a bill.'],
+    ['both-houses', '🏛️', 'Through both houses', 'Get a bill through both chambers of a bicameral legislature.'],
+    ['blocked', '🚧', 'The other place', 'Have a bill blocked by the upper house.'],
+    ['pay-rise', '💸', 'Brass neck', 'Vote yourselves a pay rise, and win.'],
+    ['survivor', '🛡️', 'Survivor', 'Survive a motion of no confidence.'],
+    ['term', '🗓️', 'Full term', 'Govern all the way to a scheduled election.'],
+    ['minority', '🧗', 'Against the odds', 'Reach a scheduled election as a minority government.'],
+    ['reelected', '🔁', 'Four more years', 'Win re-election.'],
+    ['change', '🔄', 'Time for a change', 'See the government change hands at an election.'],
+    ['landslide', '🌊', 'Landslide', 'Come out of an election with two-thirds of the lower house.'],
+    ['decade', '🎂', 'A decade in power', 'Keep the same party in charge for 10 years.'],
+    ['upset', '📮', 'By-election upset', 'Take a seat off the opposition in a by-election.'],
+    ['beloved', '⭐', 'Beloved', 'Reach 65% approval.'],
+    ['tomatoes', '🍅', 'Rotten tomatoes', 'Sink to 30% approval.'],
+    ['boom', '📈', 'Boom times', 'Hit 4% growth.'],
+    ['jobs', '👷', 'Full employment', 'Get unemployment down to 3.5%.'],
+    ['surplus', '⚖️', 'In the black', 'Run a budget surplus.'],
+  ].map(([id, icon, name, desc]) => ({ id, icon, name, desc }));
+
+  // Kept under their own key so they outlast resets, loads and new runs.
+  const ACH_KEY = 'parliament-builder:achievements';
+  let earned = {};
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACH_KEY));
+    if (saved && typeof saved === 'object') earned = saved;
+  } catch (e) {
+    /* storage blocked or corrupt: start with none */
+  }
+  let fresh = [];
+
+  function earn(id) {
+    if (earned[id]) return;
+    earned[id] = PB.govDate(gov().turn);
+    fresh.push(id);
+    try {
+      localStorage.setItem(ACH_KEY, JSON.stringify(earned));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  PB.earnedAchievements = () => earned;
+  // Achievements unlocked since the last call, for toasts.
+  PB.takeNewAchievements = () => fresh.splice(0).map((id) => PB.ACHIEVEMENTS.find((a) => a.id === id));
+
+  // How long the same party has led the government, for the decade achievement.
+  function trackLeader() {
+    const g = gov();
+    const leader = PB.govInfo().leader;
+    const id = leader ? leader.id : null;
+    if (id !== g.govLeader) {
+      g.govLeader = id;
+      g.govSince = g.turn;
+    } else if (id && g.turn - g.govSince >= 40) {
+      earn('decade');
+    }
+  }
+
   // --- Turns --------------------------------------------------------------------------------
   // Fill in anything the sim needs from the parliament. Safe to call on every render.
   PB.syncGov = () => {
     const g = gov();
+    if (!g.start) {
+      const parties = PB.state.parties;
+      g.start = { seats: Object.fromEntries(parties.map((p) => [p.id, [...p.seats]])), coalition: parties.filter((p) => p.coalition).map((p) => p.id) };
+    }
     ensureBase();
     syncCabinet();
+    syncByElections();
+    trackLeader();
     if (g.event && !(PB.eventById(g.event.id) || {}).choices) g.event = null;
     g.offer = g.offer.filter((id) => PB.billById(id));
     if (!g.offer.length) g.offer = newOffer();
+  };
+
+  // A fresh run. With `rewind`, the parliament goes back to how it was when
+  // the current run started, so replaying a seed retells the same story.
+  PB.restartGov = (seed, rewind) => {
+    const start = gov().start;
+    if (rewind && start) {
+      PB.state.parties.forEach((p) => {
+        p.seats = start.seats[p.id] ? [...start.seats[p.id]] : [0, 0];
+        p.coalition = start.coalition.includes(p.id);
+      });
+    }
+    PB.state.gov = PB.newGov(String(seed || '').trim().toUpperCase() || undefined);
   };
 
   PB.govEndTurn = () => {
@@ -622,19 +889,25 @@
     g.turn++;
     g.history.push(Math.round(g.approval));
     if (g.history.length > 80) g.history.shift();
-    // Approval drifts back towards neutral, with a little wobble.
-    nudge((NEUTRAL - g.approval) * 0.1 + rand(-1.5, 1.5));
+    // Approval drifts back towards neutral with a little wobble, and follows the economy.
+    nudge((NEUTRAL - g.approval) * 0.1 + rand(-1.5, 1.5) + stepEconomy());
     for (const id in g.base) g.noise[id] = (g.noise[id] || 0) * 0.6 + rand(-1, 1);
 
     const info = PB.govInfo();
     const risk = !info.members.length ? 0 : info.isMajority ? (g.approval < 25 ? 0.15 : 0) : g.approval < 42 ? 0.2 : 0;
     if (g.turn >= g.electionDue) {
+      if (info.members.length) earn('term');
+      if (info.members.length && !info.isMajority) earn('minority');
       out.election = holdElection(false);
-    } else if (Math.random() < risk) {
+    } else if (random() < risk) {
       out.confidence = confidenceVote();
       if (out.confidence.passed) out.election = holdElection(true);
     }
-    if (!out.election) out.event = rollEvent();
+    if (!out.election) {
+      out.byElections = runByElections();
+      out.event = rollEvent();
+    }
+    trackLeader();
     g.voted = false;
     g.offer = newOffer();
     return out;
@@ -692,18 +965,48 @@
         .join('')}`;
   };
 
-  PB.renderTrendSVG = (history) => {
-    const pts = history.slice(-40);
+  // Sparkline of the last 40 values, with a dashed line at `mid`. The scale
+  // always covers mid ± span so small wobbles don't look dramatic.
+  function spark(values, mid, span, label, cls = 'trend') {
+    const pts = values.slice(-40);
     const W = 300;
     const H = 64;
-    const lo = Math.max(0, Math.min(40, ...pts) - 5);
-    const hi = Math.min(100, Math.max(60, ...pts) + 5);
+    const lo = Math.min(mid - span, ...pts) - span / 2;
+    const hi = Math.max(mid + span, ...pts) + span / 2;
     const x = (i) => (pts.length > 1 ? (i / (pts.length - 1)) * W : W / 2);
     const y = (v) => (H - 4 - ((v - lo) / (hi - lo)) * (H - 8)).toFixed(1);
     const line = pts.length > 1 ? pts.map((v, i) => `${x(i).toFixed(1)},${y(v)}`).join(' ') : `0,${y(pts[0])} ${W},${y(pts[0])}`;
-    return `<svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Approval over the last ${pts.length} quarters">
-      <line class="trend-mid" x1="0" x2="${W}" y1="${y(50)}" y2="${y(50)}"/>
+    return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)} over the last ${pts.length} quarters">
+      <line class="trend-mid" x1="0" x2="${W}" y1="${y(mid)}" y2="${y(mid)}"/>
       <polyline class="trend-line" points="${line}"/>
     </svg>`;
+  }
+
+  PB.renderTrendSVG = (history) => spark(history, 50, 10, 'Approval');
+
+  PB.renderEconomyHTML = () => {
+    const e = gov().econ;
+    const col = (i) => e.history.map((h) => h[i]);
+    const pct = (n) => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(1)}%`;
+    const stat = (label, value, cls, i, mid, span, note = '') => `
+      <div class="econ-stat">
+        <span>${label}</span>
+        <div><b class="${cls}">${value}</b>${note}</div>
+        ${spark(col(i), mid, span, label, 'trend small')}
+      </div>`;
+    return `
+      ${stat('Growth', pct(e.growth), e.growth >= TREND + 0.5 ? 'good' : e.growth < 0 ? 'bad' : '', 0, TREND, 1.5)}
+      ${stat('Unemployment', pct(e.unemployment), e.unemployment <= NATURAL - 0.5 ? 'good' : e.unemployment >= 6 ? 'bad' : '', 1, NATURAL, 1.5)}
+      ${stat(e.balance < 0 ? 'Deficit' : 'Surplus', pct(Math.abs(e.balance)), e.balance >= 0 ? 'good' : e.balance < -5 ? 'bad' : '', 2, 0, 3, '<small class="muted">of GDP</small>')}`;
   };
+
+  PB.renderAchievementsHTML = () =>
+    PB.ACHIEVEMENTS.map((a) => {
+      const when = earned[a.id];
+      return `
+      <div class="ach${when ? ' got' : ''}">
+        <span class="ach-icon" aria-hidden="true">${when ? a.icon : '🔒'}</span>
+        <div><b>${esc(a.name)}</b><small>${esc(a.desc)}${when ? ` Unlocked ${esc(when)}.` : ''}</small></div>
+      </div>`;
+    }).join('');
 })(window.PB);

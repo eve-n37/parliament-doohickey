@@ -377,6 +377,31 @@ fieldset > button.small { margin-bottom: 0.6rem; }
 .minister > span:last-child { max-width: 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .gov-settings { margin-top: 1rem; }
+.gov-settings .actions { margin-bottom: 0.5rem; }
+#gov-seed { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: -0.1rem 0 0.45rem; }
+.tag.up { color: var(--good); border-color: currentColor; }
+.tag.down { color: var(--bad); border-color: currentColor; }
+
+.econ { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+.econ-stat span { display: block; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.econ-stat b { font-size: 1.2rem; }
+.econ-stat small { margin-left: 0.3rem; font-size: 0.75rem; }
+.trend.small { height: 36px; margin-top: 0.2rem; }
+
+.ach-card summary { cursor: pointer; list-style: none; }
+.ach-card summary::-webkit-details-marker { display: none; }
+.ach-card summary h2 { display: inline-block; margin: 0; }
+.ach-card summary h2::before { content: '▸ '; color: var(--muted); }
+.ach-card[open] summary h2::before { content: '▾ '; }
+.ach-card[open] summary { margin-bottom: 0.7rem; }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 0.5rem; }
+.ach { display: flex; gap: 0.55rem; align-items: flex-start; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); opacity: 0.55; }
+.ach.got { opacity: 1; border-color: var(--accent); }
+.ach-icon { font-size: 1.3rem; line-height: 1.2; }
+.ach b { display: block; font-size: 0.88rem; }
+.ach small { display: block; font-size: 0.78rem; color: var(--muted); }
 .gov-settings summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; margin-bottom: 0.6rem; }
 
 .swatch {
@@ -481,4 +506,13 @@ fieldset > button.small { margin-bottom: 0.6rem; }
 @media (max-width: 420px) {
   .row2 { grid-template-columns: 1fr; }
   .party-btns { margin-left: 0; }
+
+  /* Three tabs only just fit on small phones: share the width evenly. */
+  .tabs { width: 100%; }
+  .tab { flex: 1; padding: 0.35rem 0.4rem; font-size: 0.88rem; }
+
+  /* Economy: one row per figure, sparkline alongside. */
+  .econ { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+  .econ-stat { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); column-gap: 0.8rem; align-items: center; }
+  .econ-stat .trend { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
 }
