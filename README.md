@@ -7,6 +7,7 @@ Build fictional parliaments and make Wikipedia-style infoboxes for their parties
 ## Features
 
 **Parliament**
+- Unicameral or bicameral: each chamber has its own name, layout and seat counts, while parties are shared between them
 - Hemicycle, horseshoe, circle and Westminster layouts
 - Each party gets a clean wedge of seats, and you can reorder parties left to right
 - Coalition tracker: tick parties to see whether they reach a majority
@@ -18,7 +19,7 @@ Build fictional parliaments and make Wikipedia-style infoboxes for their parties
 **Party infobox**
 - Styled after Wikipedia's `{{Infobox political party}}`
 - Logo upload, multiple leaders, ideology list, colours swatch, custom rows
-- Seat bars pull straight from the parliament, and you can add extra rows (regional councils and so on)
+- Seat bars pull straight from the parliament (one per chamber), and you can add extra rows (regional councils and so on)
 - Export as **PNG**, or copy the **wikitext** to paste into a wiki
 
 **Data**

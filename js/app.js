@@ -48,10 +48,11 @@
   }
 
   function renderStats() {
+    const c = PB.activeChamber();
     const total = PB.totalSeats();
     const maj = PB.majority(total);
     const coal = PB.coalitionSeats();
-    const coalParties = st().parties.filter((p) => p.coalition && p.seats > 0);
+    const coalParties = st().parties.filter((p) => p.coalition && p.seats[c] > 0);
     const pct = (n) => (total ? (n / total) * 100 : 0);
 
     let coalHtml;
@@ -59,7 +60,7 @@
       coalHtml = '<p class="muted small">Tick <b>Coalition</b> on some parties to test a government.</p>';
     } else {
       const ok = coal >= maj;
-      const segs = coalParties.map((p) => `<div style="width:${pct(p.seats)}%;background:${esc(p.color)}" title="${esc(p.name)}: ${p.seats}"></div>`).join('');
+      const segs = coalParties.map((p) => `<div style="width:${pct(p.seats[c])}%;background:${esc(p.color)}" title="${esc(p.name)}: ${p.seats[c]}"></div>`).join('');
       coalHtml = `
         <div class="coal-bar">${segs}<span class="coal-tick" style="left:${pct(maj)}%"></span></div>
         <p class="small"><b>${coal}</b> coalition seats ·
@@ -69,7 +70,7 @@
     $('#stats').innerHTML = `
       <div class="stat"><span>Total seats</span><b>${total}</b></div>
       <div class="stat"><span>Majority</span><b>${total ? maj : '–'}</b></div>
-      <div class="stat"><span>Parties</span><b>${st().parties.filter((p) => p.seats > 0).length}</b></div>
+      <div class="stat"><span>Parties</span><b>${st().parties.filter((p) => p.seats[c] > 0).length}</b></div>
       <div class="coal">${coalHtml}</div>`;
   }
 
@@ -98,27 +99,58 @@
   };
 
   function fillChamber() {
-    const leg = st().legislature;
+    const leg = PB.chamber();
     for (const sel in chamberFields) {
       const [key, prop] = chamberFields[sel];
       $(sel)[prop] = leg[key];
     }
     syncLayoutClasses();
+    syncChamberSwitch();
   }
 
   function syncLayoutClasses() {
-    const wm = st().legislature.layout === 'westminster';
-    document.body.classList.toggle('is-westminster', wm);
+    document.body.classList.toggle('is-westminster', PB.chamber().layout === 'westminster');
+    document.body.classList.toggle('is-bicameral', st().system === 'bicameral');
+  }
+
+  function syncChamberSwitch() {
+    document.querySelectorAll('[data-system]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.system === st().system));
+    document.querySelectorAll('[data-chamber]').forEach((b) => {
+      const c = +b.dataset.chamber;
+      b.querySelector('span').textContent = st().chambers[c].name || (c ? 'Upper house' : 'Lower house');
+      b.classList.toggle('active', c === PB.activeChamber());
+      b.setAttribute('aria-selected', c === PB.activeChamber());
+    });
   }
 
   for (const sel in chamberFields) {
     const [key, prop] = chamberFields[sel];
     $(sel).addEventListener('input', (e) => {
-      st().legislature[key] = e.target[prop];
+      PB.chamber()[key] = e.target[prop];
       syncLayoutClasses();
+      if (key === 'name') syncChamberSwitch();
       refresh();
     });
   }
+
+  // --- Unicameral / bicameral -------------------------------------------------
+  // Switching to unicameral keeps the upper house's data, it's just hidden.
+  document.querySelectorAll('[data-system]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (st().system === b.dataset.system) return;
+      st().system = b.dataset.system;
+      renderAll();
+    })
+  );
+
+  document.querySelectorAll('[data-chamber]').forEach((b) =>
+    b.addEventListener('click', () => {
+      st().activeChamber = +b.dataset.chamber;
+      fillChamber();
+      renderPartyList();
+      refresh();
+    })
+  );
 
   // --- Party list ------------------------------------------------------------
   const BENCHES = [
@@ -139,7 +171,7 @@
         <div class="party-main">
           <input type="color" data-f="color" value="${esc(p.color)}" aria-label="Party colour">
           <input type="text" data-f="name" value="${esc(p.name)}" placeholder="Party name" aria-label="Party name">
-          <input type="number" data-f="seats" value="${p.seats}" min="0" step="1" aria-label="Seats">
+          <input type="number" data-f="seats" value="${p.seats[PB.activeChamber()]}" min="0" step="1" aria-label="Seats in ${esc(PB.chamber().name)}">
         </div>
         <div class="party-sub">
           <input type="text" data-f="short" value="${esc(p.short)}" placeholder="Abbr." aria-label="Abbreviation" class="abbr">
@@ -166,7 +198,7 @@
     if (!card || !el.dataset.f) return;
     const p = partyById(card.dataset.id);
     const f = el.dataset.f;
-    if (f === 'seats') p.seats = Math.max(0, Math.floor(el.valueAsNumber || 0));
+    if (f === 'seats') p.seats[PB.activeChamber()] = Math.max(0, Math.floor(el.valueAsNumber || 0));
     else if (f === 'coalition') p.coalition = el.checked;
     else p[f] = el.value;
     if (f === 'name' || f === 'color') renderIbSelect();
@@ -222,7 +254,9 @@
     const used = new Set(st().parties.map((p) => p.color));
     const palette = ['#e4003b', '#0087dc', '#2e9e4f', '#f2b51d', '#6d2e8b', '#ff7f00', '#00a3a3', '#8b5a2b', '#d81b60', '#1a237e'];
     const color = palette.find((c) => !used.has(c)) || '#9aa0a6';
-    st().parties.push(PB.newParty({ name: `Party ${st().parties.length + 1}`, color }));
+    const seats = [0, 0];
+    seats[PB.activeChamber()] = 10;
+    st().parties.push(PB.newParty({ name: `Party ${st().parties.length + 1}`, color, seats }));
     renderPartyList();
     renderIbSelect();
     refresh();
@@ -232,15 +266,16 @@
 
   $('#btn-random').addEventListener('click', () => {
     replaceWithUndo('Rolled a random parliament.', () => {
-      const total = [101, 150, 200, 299, 350, 450, 600, 650][Math.floor(Math.random() * 8)];
-      st().parties = PB.randomParties(total);
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      st().parties = PB.randomParties([pick([101, 150, 200, 299, 350, 450, 600, 650]), pick([50, 60, 75, 100, 150])]);
       st().ibPartyId = st().parties[0].id;
     });
   });
 
   $('#sort-select').addEventListener('change', (e) => {
     const list = st().parties;
-    if (e.target.value === 'seats') list.sort((a, b) => b.seats - a.seats);
+    const c = PB.activeChamber();
+    if (e.target.value === 'seats') list.sort((a, b) => b.seats[c] - a.seats[c]);
     if (e.target.value === 'coalition') list.sort((a, b) => b.coalition - a.coalition);
     if (e.target.value === 'reverse') list.reverse();
     e.target.value = '';
@@ -333,7 +368,7 @@
 
       <fieldset>
         <legend>Seats</legend>
-        <label class="check"><input type="checkbox" data-k="showLegislatureSeats"> Show seats in the parliament (${p.seats} / ${PB.totalSeats()})</label>
+        <label class="check"><input type="checkbox" data-k="showLegislatureSeats"> Show seats in the legislature (${PB.chambersInUse().map((c) => `${p.seats[c]} / ${PB.totalSeats(c)}`).join(', ')})</label>
         ${listRows('extraSeats', 'extraSeats', [['title', 'e.g. Regional councillors'], ['seats', 'Seats', 'number'], ['total', 'Total', 'number']])}
         <button type="button" class="small" data-add="extraSeats">+ Add seat row</button>
       </fieldset>
@@ -431,13 +466,13 @@
   // --- Exports -------------------------------------------------------------------
   $('#dl-svg').addEventListener('click', () => {
     const svg = PB.renderParliamentSVG(st());
-    PB.download(`${PB.slug(st().legislature.name)}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
+    PB.download(`${PB.slug(PB.chamber().name)}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
   });
 
   $('#dl-png').addEventListener('click', async () => {
     try {
       const blob = await PB.svgToPng(PB.renderParliamentSVG(st()), 2);
-      PB.download(`${PB.slug(st().legislature.name)}.png`, blob);
+      PB.download(`${PB.slug(PB.chamber().name)}.png`, blob);
     } catch (err) {
       PB.notify(err.message, 'error');
     }
@@ -474,7 +509,7 @@
 
   // --- Save / load / reset -------------------------------------------------------------
   $('#btn-export-json').addEventListener('click', () => {
-    PB.download(`${PB.slug(st().legislature.name)}.json`, new Blob([JSON.stringify(st(), null, 2)], { type: 'application/json' }));
+    PB.download(`${PB.slug(st().chambers[0].name)}.json`, new Blob([JSON.stringify(st(), null, 2)], { type: 'application/json' }));
   });
 
   $('#file-import').addEventListener('change', (e) => {

@@ -98,9 +98,9 @@
   }
 
   // Returns seats as [{x, y, party}] in unit coords plus the seat radius.
-  PB.computeSeats = (state) => {
-    const leg = state.legislature;
-    const parties = state.parties.filter((p) => p.seats > 0);
+  // `parties` here carry a plain seat count for this chamber.
+  PB.computeSeats = (leg, allParties) => {
+    const parties = allParties.filter((p) => p.seats > 0);
     const sizeFactor = (leg.size || 85) / 100;
 
     if (leg.layout === 'westminster') {
@@ -129,10 +129,12 @@
     return { seats, dot: spacing * 0.46 * sizeFactor, kind: 'arc', spacing, inner, full, total };
   };
 
-  PB.renderParliamentSVG = (state) => {
-    const leg = state.legislature;
+  // Draws one chamber (index `c`, default: the one being edited).
+  PB.renderParliamentSVG = (state, c = PB.activeChamber(state)) => {
+    const leg = state.chambers[c];
+    const parties = state.parties.map((p) => ({ ...p, seats: p.seats[c] }));
     const esc = PB.esc;
-    const layout = PB.computeSeats(state);
+    const layout = PB.computeSeats(leg, parties);
     const { seats, dot } = layout;
     const W = 640;
     const pad = 20;
@@ -140,7 +142,7 @@
     const ink = '#202122';
 
     if (!seats.length) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} 200" width="${W}" height="200"><text x="${W / 2}" y="100" text-anchor="middle" ${font} font-size="16" fill="#72777d">Add some parties with seats to see your parliament</text></svg>`;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} 200" width="${W}" height="200"><text x="${W / 2}" y="100" text-anchor="middle" ${font} font-size="16" fill="#72777d">Give some parties seats in this chamber to see it</text></svg>`;
     }
 
     // Fit the seats to the drawing width.
@@ -198,7 +200,7 @@
     let H = titleH + chartH + pad * 2;
 
     if (leg.legend) {
-      const items = state.parties.filter((p) => p.seats > 0);
+      const items = parties.filter((p) => p.seats > 0);
       const cols = items.length > 4 ? 2 : 1;
       const colW = (W - pad * 2) / cols;
       const rowH = 24;

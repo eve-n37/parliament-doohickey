@@ -69,8 +69,11 @@
     info.custom.filter((c) => c.label || c.value).forEach((c) => out.push(row(c.label, esc(c.value).replace(/\n/g, '<br>'))));
 
     const seatRows = [];
-    if (info.showLegislatureSeats && state.legislature.name) {
-      seatRows.push({ title: `Seats in the ${state.legislature.name}`, seats: party.seats, total: PB.totalSeats() });
+    if (info.showLegislatureSeats) {
+      PB.chambersInUse(state).forEach((c) => {
+        const name = state.chambers[c].name;
+        if (name) seatRows.push({ title: `Seats in the ${name}`, seats: party.seats[c], total: PB.totalSeats(c, state) });
+      });
     }
     info.extraSeats.filter((s) => s.title).forEach((s) => seatRows.push({ title: s.title, seats: +s.seats || 0, total: +s.total || 0 }));
     seatRows.forEach((s) => {
@@ -125,10 +128,14 @@
     add('anthem', clean(info.anthem));
 
     let n = 1;
-    if (info.showLegislatureSeats && state.legislature.name) {
-      add(`seats${n}_title`, `Seats in the ${clean(state.legislature.name)}`);
-      add(`seats${n}`, `{{Composition bar|${party.seats}|${PB.totalSeats()}|hex=${party.color}}}`);
-      n++;
+    if (info.showLegislatureSeats) {
+      PB.chambersInUse(state).forEach((c) => {
+        const name = state.chambers[c].name;
+        if (!name) return;
+        add(`seats${n}_title`, `Seats in the ${clean(name)}`);
+        add(`seats${n}`, `{{Composition bar|${party.seats[c]}|${PB.totalSeats(c, state)}|hex=${party.color}}}`);
+        n++;
+      });
     }
     info.extraSeats.filter((s) => s.title).forEach((s) => {
       add(`seats${n}_title`, clean(s.title));

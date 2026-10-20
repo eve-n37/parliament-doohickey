@@ -35,16 +35,36 @@ window.PB = window.PB || {};
     custom: [], // { label, value }
   });
 
-  PB.newParty = (overrides = {}) => ({
-    id: PB.uid(),
-    name: 'New Party',
-    short: '',
-    color: '#9aa0a6',
-    seats: 10,
-    coalition: false,
-    bench: 'auto',
+  // Seats are stored per chamber: [lower (or only) chamber, upper chamber].
+  // A plain number (older saves) means seats in the first chamber.
+  const seatCount = (n) => Math.max(0, Math.floor(Number(n) || 0));
+  PB.seatPair = (s) => (Array.isArray(s) ? [seatCount(s[0]), seatCount(s[1])] : [seatCount(s), 0]);
+
+  PB.newParty = (overrides = {}) => {
+    const p = {
+      id: PB.uid(),
+      name: 'New Party',
+      short: '',
+      color: '#9aa0a6',
+      seats: [10, 0],
+      coalition: false,
+      bench: 'auto',
+      ...overrides,
+      info: { ...PB.blankInfo(), ...(overrides.info || {}) },
+    };
+    p.seats = PB.seatPair(p.seats);
+    return p;
+  };
+
+  PB.newChamber = (overrides = {}) => ({
+    name: 'New Chamber',
+    layout: 'hemicycle',
+    shape: 'circle',
+    size: 85,
+    legend: true,
+    majority: true,
+    title: true,
     ...overrides,
-    info: { ...PB.blankInfo(), ...(overrides.info || {}) },
   });
 
   PB.sampleState = () => {
@@ -53,21 +73,15 @@ window.PB = window.PB || {};
       ['Independent', 'IND', '#9e9e9e', 5, false],
       ['Vacant', '', '#e0e0e0', 3, false],
       ['Federalist Party', 'FED', '#f2dc6d', 293, true],
-    ].map(([name, short, color, seats, coalition]) => PB.newParty({ name, short, color, seats, coalition }));
+    ].map(([name, short, color, seats, coalition]) => PB.newParty({ name, short, color, seats: [seats, 0], coalition }));
 
     // Keep vacant seats off both sides in the Westminster layout.
     parties[2].bench = 'crossbench';
 
     return {
-      legislature: {
-        name: 'NAU House of Representatives',
-        layout: 'hemicycle',
-        shape: 'circle',
-        size: 85,
-        legend: true,
-        majority: true,
-        title: true,
-      },
+      system: 'unicameral',
+      activeChamber: 0,
+      chambers: [PB.newChamber({ name: 'NAU House of Representatives' }), PB.newChamber({ name: 'NAU Senate' })],
       parties,
       ibPartyId: parties[3].id,
     };
@@ -101,15 +115,18 @@ window.PB = window.PB || {};
   };
 
   // Fill in missing fields so older/hand-edited JSON files still load.
+  // Saves from before bicameral support have a single `legislature` object.
   PB.normalize = (data) => {
     const base = PB.sampleState();
+    const chambers = Array.isArray(data.chambers) ? data.chambers : data.legislature ? [data.legislature] : [];
     const st = {
-      legislature: { ...base.legislature, ...(data.legislature || {}) },
+      system: data.system === 'bicameral' ? 'bicameral' : 'unicameral',
+      activeChamber: data.activeChamber === 1 ? 1 : 0,
+      chambers: [0, 1].map((c) => PB.newChamber({ ...base.chambers[c], ...(chambers[c] || {}) })),
       parties: Array.isArray(data.parties) ? data.parties.map((p) => PB.newParty({ ...p, id: p.id || PB.uid() })) : base.parties,
       ibPartyId: data.ibPartyId,
     };
     st.parties.forEach((p) => {
-      p.seats = Math.max(0, Math.floor(Number(p.seats) || 0));
       if (!Array.isArray(p.info.leaders)) p.info.leaders = [];
       if (!Array.isArray(p.info.extraSeats)) p.info.extraSeats = [];
       if (!Array.isArray(p.info.custom)) p.info.custom = [];
@@ -117,9 +134,14 @@ window.PB = window.PB || {};
     return st;
   };
 
-  PB.totalSeats = () => PB.state.parties.reduce((a, p) => a + (p.seats || 0), 0);
+  // Chamber helpers. `c` is a chamber index; it defaults to the one being edited.
+  PB.chambersInUse = (state = PB.state) => (state.system === 'bicameral' ? [0, 1] : [0]);
+  PB.activeChamber = (state = PB.state) => (state.system === 'bicameral' ? state.activeChamber : 0);
+  PB.chamber = (c = PB.activeChamber()) => PB.state.chambers[c];
+
+  PB.totalSeats = (c = PB.activeChamber(), state = PB.state) => state.parties.reduce((a, p) => a + p.seats[c], 0);
   PB.majority = (total = PB.totalSeats()) => Math.floor(total / 2) + 1;
-  PB.coalitionSeats = () => PB.state.parties.filter((p) => p.coalition).reduce((a, p) => a + (p.seats || 0), 0);
+  PB.coalitionSeats = (c = PB.activeChamber()) => PB.state.parties.filter((p) => p.coalition).reduce((a, p) => a + p.seats[c], 0);
 
   PB.benchOf = (p) => (p.bench && p.bench !== 'auto' ? p.bench : p.coalition ? 'government' : 'opposition');
 
@@ -163,23 +185,30 @@ window.PB = window.PB || {};
 
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  PB.randomParties = (total) => {
+  // totals = [lower seats, upper seats]. The upper chamber gets a shuffled-up
+  // version of the same weights so the two houses look related but not identical.
+  PB.randomParties = (totals) => {
     const n = 3 + Math.floor(Math.random() * 6);
     const usedNames = new Set();
     const colors = [...COLORS].sort(() => Math.random() - 0.5);
     // Squared random weights give a believable mix of big and small parties.
     const weights = Array.from({ length: n }, () => Math.random() ** 2 + 0.03);
-    const sum = weights.reduce((a, b) => a + b, 0);
-    const seats = weights.map((w) => Math.floor((w / sum) * total));
-    seats[0] += total - seats.reduce((a, b) => a + b, 0);
+    const split = (ws, total) => {
+      const sum = ws.reduce((a, b) => a + b, 0);
+      const out = ws.map((w) => Math.floor((w / sum) * total));
+      out[0] += total - out.reduce((a, b) => a + b, 0);
+      return out;
+    };
+    const lower = split(weights, totals[0]);
+    const upper = split(weights.map((w) => w * (0.5 + Math.random())), totals[1]);
 
-    return seats.map((s, i) => {
+    return lower.map((s, i) => {
       let name;
       do name = `${pick(PREFIX)} ${pick(SUFFIX)}`;
       while (usedNames.has(name));
       usedNames.add(name);
       const short = name.split(/\s+/).map((w) => w[0]).join('').toUpperCase();
-      return PB.newParty({ name, short, color: colors[i % colors.length], seats: s });
+      return PB.newParty({ name, short, color: colors[i % colors.length], seats: [s, upper[i]] });
     });
   };
 })(window.PB);

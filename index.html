@@ -36,8 +36,18 @@
     <section id="tab-parliament" class="tab-panel active">
       <div class="layout">
         <aside class="panel">
-          <h2>Chamber</h2>
-          <label>Legislature name<input type="text" id="leg-name"></label>
+          <h2>Legislature</h2>
+          <div class="segmented" role="group" aria-label="Legislature type">
+            <button type="button" data-system="unicameral" aria-pressed="true">Unicameral</button>
+            <button type="button" data-system="bicameral" aria-pressed="false">Bicameral</button>
+          </div>
+          <div class="chamber-switch bicam-only" role="tablist" aria-label="Chamber">
+            <button type="button" role="tab" data-chamber="0"><small>Lower house</small><span></span></button>
+            <button type="button" role="tab" data-chamber="1"><small>Upper house</small><span></span></button>
+          </div>
+
+          <h2 class="gap">Chamber</h2>
+          <label>Chamber name<input type="text" id="leg-name"></label>
           <div class="row2">
             <label>Layout
               <select id="leg-layout">
