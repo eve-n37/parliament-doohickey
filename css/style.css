@@ -288,11 +288,14 @@ h2.gap { margin-top: 1.1rem; }
 .coal-tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); transform: translateX(-1px); }
 
 /* --- Infobox editor ----------------------------------------------------------- */
+/* Browsers give fieldsets min-width: min-content, which stops them shrinking
+   below their widest row and makes the page scroll sideways on phones. */
 fieldset {
   border: 1px solid var(--border);
   border-radius: 9px;
   padding: 0.6rem 0.8rem 0.4rem;
   margin: 0 0 0.8rem;
+  min-width: 0;
 }
 legend { font-weight: 600; font-size: 0.85rem; padding: 0 0.3rem; }
 fieldset > button.small { margin-bottom: 0.6rem; }
