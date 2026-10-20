@@ -19,6 +19,29 @@
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
+  // --- Theme ---------------------------------------------------------------
+  // Follows the system until the user picks one; the choice is applied early in
+  // index.html so the page doesn't flash.
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const currentTheme = () => document.documentElement.dataset.theme || (darkQuery.matches ? 'dark' : 'light');
+
+  function syncThemeButton() {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    const btn = $('#btn-theme');
+    btn.textContent = next === 'dark' ? '🌙' : '☀️';
+    btn.title = `Switch to ${next} mode`;
+    btn.setAttribute('aria-label', btn.title);
+  }
+
+  $('#btn-theme').addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('parliament-builder:theme', next); } catch (e) { /* ignore */ }
+    syncThemeButton();
+  });
+  darkQuery.addEventListener('change', syncThemeButton);
+  syncThemeButton();
+
   // --- Rendering -----------------------------------------------------------
   function renderParliament() {
     $('#parliament-svg').innerHTML = PB.renderParliamentSVG(st());

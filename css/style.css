@@ -15,8 +15,10 @@
   color-scheme: light;
 }
 
+/* Dark tokens apply when the system prefers dark (unless the user picked light),
+   or when the user picked dark explicitly via the theme toggle. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #18171a;
     --surface: #222126;
     --surface-2: #2a2930;
@@ -31,6 +33,22 @@
     --shadow: none;
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #18171a;
+  --surface: #222126;
+  --surface-2: #2a2930;
+  --border: #3a3842;
+  --text: #ece9f1;
+  --muted: #a19cab;
+  --accent: #b28ae6;
+  --accent-ink: #18171a;
+  --good: #6fd38f;
+  --bad: #ff8a80;
+  --paper: #fbfaf8;
+  --shadow: none;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -104,6 +122,7 @@ button.ghost { background: transparent; }
 button.wide { width: 100%; margin-top: 0.6rem; }
 button.small, .btn.small { padding: 0.2rem 0.55rem; font-size: 0.85rem; }
 button.icon { padding: 0.15rem 0.45rem; min-width: 1.9rem; }
+.theme-toggle { font-size: 1.05rem; min-width: 2.4rem; }
 button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
 
 label, .field { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.6rem; }

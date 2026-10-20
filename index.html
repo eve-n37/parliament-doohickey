@@ -8,6 +8,13 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/wikibox.css">
+  <script>
+    // Apply a saved theme before first paint so there's no flash of the wrong one.
+    try {
+      const t = localStorage.getItem('parliament-builder:theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) { /* storage blocked: follow the system theme */ }
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +27,7 @@
       <button type="button" id="btn-export-json" title="Download everything as a .json file">Save</button>
       <label class="btn" title="Load a saved .json file">Load<input type="file" id="file-import" accept="application/json,.json" hidden></label>
       <button type="button" id="btn-reset" class="ghost">Reset</button>
+      <button type="button" id="btn-theme" class="icon theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
     </div>
   </header>
 
