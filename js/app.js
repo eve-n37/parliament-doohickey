@@ -150,7 +150,7 @@
     refresh();
   });
 
-  $('#party-list').addEventListener('click', (e) => {
+  $('#party-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const id = btn.closest('.party').dataset.id;
@@ -160,8 +160,15 @@
     if (act === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
     if (act === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
     if (act === 'del') {
-      if (!confirm(`Delete "${list[i].name}"? Its infobox goes with it.`)) return;
-      list.splice(i, 1);
+      const ok = await PB.ask({
+        title: 'Delete party?',
+        message: `"${list[i].name}" and its infobox will be removed.`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      const idx = st().parties.findIndex((p) => p.id === id);
+      if (idx !== -1) st().parties.splice(idx, 1);
     }
     if (act === 'infobox') {
       st().ibPartyId = id;
@@ -186,8 +193,15 @@
     if (last) { last.focus(); last.select(); }
   });
 
-  $('#btn-random').addEventListener('click', () => {
-    if (st().parties.length && !confirm('Replace your parties with a random parliament? (Save a .json first if you want to keep them.)')) return;
+  $('#btn-random').addEventListener('click', async () => {
+    if (
+      st().parties.length &&
+      !(await PB.ask({
+        title: 'Roll a random parliament?',
+        message: 'This replaces your current parties. Save a .json first if you want to keep them.',
+        confirmLabel: 'Roll the dice',
+      }))
+    ) return;
     const total = [101, 150, 200, 299, 350, 450, 600, 650][Math.floor(Math.random() * 8)];
     st().parties = PB.randomParties(total);
     st().ibPartyId = st().parties[0].id;
@@ -358,7 +372,7 @@
       renderIbForm();
       refresh();
     } catch (err) {
-      alert('Could not read that image.');
+      PB.notify('Could not read that image.', 'error');
     }
   });
 
@@ -395,7 +409,7 @@
       const blob = await PB.svgToPng(PB.renderParliamentSVG(st()), 2);
       PB.download(`${PB.slug(st().legislature.name)}.png`, blob);
     } catch (err) {
-      alert(err.message);
+      PB.notify(err.message, 'error');
     }
   });
 
@@ -403,7 +417,7 @@
     const node = $('#ib-preview .wikibox');
     if (!node) return;
     if (!window.htmlToImage) {
-      alert('The image export library didn\'t load (are you offline?). The wikitext export still works.');
+      PB.notify('The image export library didn\'t load (are you offline?). The wikitext export still works.', 'error', 6000);
       return;
     }
     try {
@@ -411,7 +425,7 @@
       const blob = await (await fetch(url)).blob();
       PB.download(`${PB.slug(partyById(st().ibPartyId).name)}-infobox.png`, blob);
     } catch (err) {
-      alert('PNG export failed. If your logo is a link to another site, try uploading the image instead.');
+      PB.notify('PNG export failed. If your logo is a link to another site, try uploading the image instead.', 'error', 6000);
     }
   });
 
@@ -442,15 +456,21 @@
         PB.state = PB.normalize(JSON.parse(reader.result));
         renderAll();
       } catch (err) {
-        alert('That file doesn\'t look like a Parliament Builder save.');
+        PB.notify('That file doesn\'t look like a Parliament Builder save.', 'error');
       }
       e.target.value = '';
     };
     reader.readAsText(file);
   });
 
-  $('#btn-reset').addEventListener('click', () => {
-    if (!confirm('Reset everything back to the example parliament?')) return;
+  $('#btn-reset').addEventListener('click', async () => {
+    const ok = await PB.ask({
+      title: 'Reset everything?',
+      message: 'This goes back to the example parliament and throws away your parties and infoboxes.',
+      confirmLabel: 'Reset',
+      danger: true,
+    });
+    if (!ok) return;
     PB.state = PB.sampleState();
     renderAll();
   });

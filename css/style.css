@@ -264,6 +264,61 @@ fieldset > button.small { margin-bottom: 0.6rem; }
 
 .foot { text-align: center; padding: 1rem 1rem 2rem; }
 
+/* --- Dialog + toasts ------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+.modal-backdrop[hidden] { display: none; }
+
+.modal {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem 1rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.modal h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+.modal p { margin: 0 0 1rem; color: var(--muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+button.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+button.danger-solid:hover { border-color: var(--text); }
+
+.toasts {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  pointer-events: none;
+}
+.toast {
+  background: var(--text);
+  color: var(--bg);
+  padding: 0.55rem 0.9rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.toast-error { background: var(--bad); color: #fff; }
+.toast.leaving { opacity: 0; transform: translateY(6px); }
+
 /* --- Small screens --------------------------------------------------------------- */
 @media (max-width: 860px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
